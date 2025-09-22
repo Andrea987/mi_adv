@@ -61,7 +61,7 @@ if __name__ == "__main__":
     gen = 'fixed'
     dim = args.dim
     info_axis = 'train'  # train or p_seen
-    n_train = [200, 350, 500]  # check how dataset are generated, there should be some problems with 'fixed'
+    n_train = [50, 70, 90]  # check how dataset are generated, there should be some problems with 'fixed'
     lenght_vec = len(n_train)
     p_seen_both = [0.7, 1, 1]
     length_vec = len(p_seen_both)
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     #list_imp_cov_methods = [('BR_si', 'sd'), ('l_d', 'sd'), ('mi', 'sd', 1)]
 
     #list_methods_strategy = make_dictionary_method(list_imp_cov_methods)
-    mi_nbr = 5
+    mi_nbr = 2
     nbr_cand = 10
     it_mc = 2  # iteartion markov chain, for multiple imputation method
     # def get_path(X, y, estimator, amax, dts_max, mis_max, S_dict, eps_amax=1e-4, eps_dts_max=1e-3, eps_mis_max=1e-3, n_alphas=100, n_deltas_dts=2, n_deltas_mis=3):
