@@ -139,6 +139,7 @@ def update_column(x_i, m_i, X_i_del, theta):
     first = x_i * (1 - m_i)
     #third = m_i * X_i_del.T
     second = (m_i * X_i_del.T).T @ theta #np.random.randn(len(theta)) * 0.1)  # sampling part
+    second = second + m_i * np.random.randn(len(second)) * np.std(second)
     return first + second
 
 def update_low_rank_matrix():
@@ -378,9 +379,8 @@ def iteration(info, crr_j):
 
 np.random.seed(42)
 n, d = 600, 100
-m = np.random.binomial(1, 0.10, size=(n, d))
-#X = np.random.rand(n, d)
-X = np.random.randint(1, 4, size=(n, d)) + 0.0  # + np.random.rand(n, d)/1000 + 0.0
+m = np.random.binomial(1, 0.2, size=(n, d))
+X = np.random.rand(n, d)
 X_nan = X.copy()
 X_nan[m==1] = np.nan
 print('wewew ', X_nan)
