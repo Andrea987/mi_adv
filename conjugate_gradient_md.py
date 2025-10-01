@@ -34,23 +34,39 @@ def update_inverse_rk2_sym(A_inv, W):
     # A_inv is the dxd symmetric inverse of the object matrix A
     # W is the matrix (u|w), dx2, such that 
     # A_new = A + uw.T + wu.T = A + W.T C W, with C = [[0, 1], [1, 0]]
-    print("shape in update inverse ", A_inv.shape)
-    print("shape in update inverse 2 ", W.shape)
-    print("W inside update rk 2 inverse \n", W)
-    print("A_inv inside fct \n", A_inv)
+    #print("shape in update inverse ", A_inv.shape)
+    #print("shape in update inverse 2 ", W.shape)
+    #print("W inside update rk 2 inverse \n", W)
+    #print("A_inv inside fct \n", A_inv)
     WTA_inv = W.T @ A_inv
-    print("\n ", WTA_inv)
+    #print("\n ", WTA_inv)
     WTA_invW = WTA_inv @ W
-    print("\n", WTA_invW)
-    print("multiplication performed")
+    #print("\n", WTA_invW)
+    #print("multiplication performed")
     C = np.array([[0, 1], [1, 0]])
     N = C + WTA_invW
     print(N)
     N_inv = inverse_2_times_2_sym(N)
     print(N_inv)
     res = A_inv - WTA_inv.T @ N_inv @ WTA_inv
-    print("res inside update 2 inv\n", res)
+    #print("res inside update 2 inv\n", res)
     return (res + res.T) / 2
+
+
+def shift_inverse(A):
+    # given a matrix A1 = [[a, b.T],[b,C]], 
+    # and given its inverse A, compute the inverse of A2 = [[C, b],[b.T,a]]
+    # observe that A2 is obtain by A1 by permuting a row and a column
+    A = np.roll(A, shift=-1, axis=0)
+    return np.roll(A, shift=-1, axis=1)
+
+def shift(A):
+    # given a matrix A1 = [[a, b.T],[b,C]], 
+    # and given its inverse A, compute the inverse of A2 = [[C, b],[b.T,a]]
+    # observe that A2 is obtain by A1 by permuting a row and a column
+    A = np.roll(A, shift=-1, axis=1)
+    return np.roll(A, shift=-1, axis=0)
+
 
 def test_inverse_2_times_sym():
     t = np.random.randint(1, 9, size=(2, 2))
@@ -77,9 +93,30 @@ def test_update_inverse_rk2_sym():
     print("left  inverse \n ", inv_a_fct @ a_upd)
 
 
+def test_shift_inverse():
+    n, d = 4, 3
+    t = np.random.randint(1, 9, size=(n, d))
+    a = t.T @ t #+ np.eye(d) * 1e-8
+    #print(a)
+    a_inv = np.linalg.inv(a)
+    #print("a inv \n", a_inv)
+    a_shift = shift(a)
+    #print(a_shift)
+    a_shift_inverse = np.linalg.inv(a_shift)
+    #print("a shift inverse \n", a_shift_inverse)
+    a_shift_inverse_fct = shift(a_inv)
+    #print("a shift inverse fct \n", a_shift_inverse_fct)
+    np.testing.assert_allclose(a_shift_inverse, a_shift_inverse_fct)
+    print("end test shift inverse")
+
+
+
+
+
 
 test_inverse_2_times_sym()
 test_update_inverse_rk2_sym()
+test_shift_inverse()
 
 def cg_solver():
     c = 1
@@ -161,6 +198,7 @@ def sampling(info):
     warm_start_j = None
     print("start program\n\n")
     for i in range(R):  # nbr iteration markov chain
+        print("\n next iter MC ", i, "\n" )
         for j in range(d):  # 0, 1, ..., d-1
             if j < d-1:
                 print("\n\nj: ", j)
@@ -181,25 +219,25 @@ def sampling(info):
                 pt_j = (vj - X_del_j[:, j]) @ X_del_j # partial_j
                 pt_j[j] = np.sum((vj - X_del_j[:, j]) * (vj + X_del_j[:, j])) / 2
                 upd_j[:, 1] = pt_j
-                print("upd_j print \n ", upd_j)
+                #print("upd_j print \n ", upd_j)
                 km_check = km + np.outer(upd_j[:, 0], upd_j[:, 1]) + np.outer(upd_j[:, 1], upd_j[:, 0])
-                print("km_check, kernel matrix updated \n", km_check)
+                #print("km_check, kernel matrix updated \n", km_check)
                 C = np.array([[0, 1], [1, 0]])
                 km_check2 = km + upd_j @ C @ upd_j.T
-                print("km check 2 \n", km_check2)
-                print("det km_check", np.linalg.det(km_check))
-                print("k_jinv times K_j", K_j_inv @ K_j)
+                #print("km check 2 \n", km_check2)
+                #print("det km_check", np.linalg.det(km_check))
+                #print("k_jinv times K_j", K_j_inv @ K_j)
                 K_j_inv1 = update_inverse_rk2_sym(K_j_inv, upd_j)
                 K_j_inv2 = inverse_2_times_2_sym(km_check)
-                print("\ninverse with fct update inverse\n", K_j_inv1)
-                print("\ninverse with inverse 2 times 2 system \n", K_j_inv2)
-                print("\ninverse np \n", np.linalg.inv(km_check))
-                print("\ninverse np(km check) @ km check \n", np.linalg.inv(km_check) @ km_check)
+                #print("\ninverse with fct update inverse\n", K_j_inv1)
+                #print("\ninverse with inverse 2 times 2 system \n", K_j_inv2)
+                #print("\ninverse np \n", np.linalg.inv(km_check))
+                #print("\ninverse np(km check) @ km check \n", np.linalg.inv(km_check) @ km_check)
                 print("\nsmall test inv \n", K_j_inv1 @ km_check)
                 K_j_inv = K_j_inv1
                 upd_j[j, 0] = 0  # set the index to 0 once again, in the next iteration it must be 0  
             else:  # j == d-1, we need to make a special move
-                print("j: ", j)
+                print("\n\nj: ", j)
                 vj = X_ini[:, j]
                 X_del_j = np.delete(X_ini, j, axis=1)
                 print("X_del_j \n", X_del_j)
@@ -223,8 +261,9 @@ def sampling(info):
                 km_check = km + np.outer(upd_j[:, 0], upd_j[:, 1]) + np.outer(upd_j[:, 1], upd_j[:, 0])
                 print("kernel matrix updated \n", km_check)
                 K_j_inv = update_inverse_rk2_sym(K_j_inv, upd_j)
-                K_j_inv = np.roll(K_j_inv, shift=1, axis=0)
-                K_j_inv = np.roll(K_j_inv, shift=1, axis=1)
+                K_j_inv = shift(K_j_inv)
+                #K_j_inv = np.roll(K_j_inv, shift=1, axis=0)
+                #K_j_inv = np.roll(K_j_inv, shift=1, axis=1)
                 print("kernel matrix updated \n", km_check)
                 print("small test inv", K_j_inv @ km_check)
                 upd_j[0, 0] = 0  # set the index to 0 once again, in the next iteration it must be 0  
