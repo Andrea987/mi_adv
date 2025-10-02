@@ -105,29 +105,9 @@ def test_cg_tf():
     print(q)
     print(q[0])
     print("icajsdfjia")
-    class MyLinearOperator(tf.linalg.LinearOperator):
-        def __init__(self, operator, dtype=np.float64, is_square=True, name=None):
-            parameters = dict(
-                dtype=dtype,
-                operator=operator,
-                is_square=is_square,
-                name=name
-            )
-            super().__init__(parameters=parameters, dtype=np.float64)
+    
 
-        #def __init__(self, mat):
-        #    self.mat = mat
-        #    super().__init__(dtype=mat.dtype, is_self_adjoint=True, is_positive_definite=True)
-        
-        @property
-        def _shape(self):
-            return self.mat.shape
-        
-        def _matvec(self, x):
-            return tf.linalg.matvec(self.mat, x)
-        
-        def _matmul(self, x):
-            return tf.linalg.matmul(self.mat, x, adjoint=False, adjoint_arg=False)
+
 
     
     op_a = MyLinearOperator(a)
@@ -148,9 +128,9 @@ def test_cg_tf():
     print("final res\n ", res.x)
     #print("final res", res)
     print("\ntest cg passed")
-#test_cholesky_tf()
-#test_cholesky_solver_tf()
-test_cg_tf()
+test_cholesky_tf()
+test_cholesky_solver_tf()
+#test_cg_tf()
 
 print("\n\nOther tests\n")
 matrices = np.array([ [[4.0, 1.0], [1.0, 3.0]], [[2.0, 0.0], [0.0, 5.0]] ]) 

@@ -7,7 +7,9 @@ from scipy.sparse.linalg import LinearOperator, cg
 from sklearn.linear_model import BayesianRidge
 import time
 
-def initialize(info):
+from utils import initialize
+
+def initialize1(info):
     X = info['X']
     M = info['masks']
     X_nan = info['X_nan']

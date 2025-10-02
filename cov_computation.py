@@ -1,12 +1,6 @@
 import numpy as np
 
 
-
-
-
-
-
-
 def cov_strategy(info, dict_observations):
     # uncertainty coming from considering the imputed values as true values (within uncertanty)
     X_imputed = dict_observations['X_imputed']
