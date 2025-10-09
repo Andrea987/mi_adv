@@ -135,7 +135,7 @@ class LinearOperatorScale(tf.linalg.LinearOperator):
     def __init__(self, scale_diag, is_non_singular=True, name="LinearOperatorScale"):
         self.scale_diag = tf.convert_to_tensor(scale_diag, name="scale_diag")
         
-        self
+        self.X
         # Determine the shape (N, N) and dtype for the base class
         # Scale diag has shape [B1, ..., Bk, N]
         diag_shape = tf.TensorShape(self.scale_diag.shape)

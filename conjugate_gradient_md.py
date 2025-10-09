@@ -224,12 +224,13 @@ def sampling(info):
             vj_updated = update_column(vj, nj, X_del_j, solj)  # here we should add the sampling
             #print("solj ", solj)
             X_ini[:, j] = vj_updated
+            vj_upd = vj_updated
             #print("X_ini after updt \n ", X_ini)
             if crr_j == d-1:
                 j=0
             upd_j[j, 0] = 1
-            pt_j = (vj - X_del_j[:, j]) @ X_del_j # partial_j
-            pt_j[j] = np.sum((vj - X_del_j[:, j]) * (vj + X_del_j[:, j])) / 2
+            pt_j = (vj_upd - X_del_j[:, j]) @ X_del_j # partial_j
+            pt_j[j] = np.sum((vj_upd - X_del_j[:, j]) * (vj_upd + X_del_j[:, j])) / 2
             upd_j[:, 1] = pt_j
             #print("upd_j print \n ", upd_j)
             km_check = km + np.outer(upd_j[:, 0], upd_j[:, 1]) + np.outer(upd_j[:, 1], upd_j[:, 0])
@@ -241,6 +242,7 @@ def sampling(info):
             #print("det km_check", np.linalg.det(km_check))
             #print("k_jinv times K_j", K_j_inv @ K_j)
             K_j_inv = update_inverse_rk2_sym(K_j_inv, upd_j)
+            print("cond number inverse: ", np.linalg.cond(K_j_inv))
             if crr_j == d-1:
                 #print("small check in the case d-1: \n", km_check @ K_j_inv)
                 #print("old inverse ", K_j_inv)
@@ -380,8 +382,9 @@ def iteration(info, crr_j):
 '''
 
 np.random.seed(42)
-n, d = 600, 100
-m = np.random.binomial(1, 0.2, size=(n, d))
+n, d = 400, 100
+R = 1  # iteration MC
+m = np.random.binomial(1, 0.4, size=(n, d))
 X = np.random.rand(n, d)
 X_nan = X.copy()
 X_nan[m==1] = np.nan
@@ -391,7 +394,7 @@ infoo = {'masks': m,
          'X': X,
          'initialize': 'mean',
          'X_nan': X_nan,
-         'it_MC': 30
+         'it_MC': 5
         }
 print(infoo)
 start1 = time.time()   # tic
@@ -399,12 +402,13 @@ res = sampling(infoo)
 end1 = time.time()     # toc
 print(f"Elapsed time no   prec: {end1 - start1:.4f} seconds")
 
-ice = IterativeImputer(estimator=BayesianRidge(), max_iter=1, initial_strategy='mean')
+ice = IterativeImputer(estimator=BayesianRidge(), max_iter=d * R, initial_strategy='mean')
 start2 = time.time()   # tic
-#res1 = ice.fit_transform(X_nan)
+res1 = ice.fit_transform(X_nan)
 end2 = time.time()     # toc
 print(f"Elapsed time no   prec: {end2 - start2:.4f} seconds")
 #print("res sampling \n", res)
+
 #print("res iter imputer \n", res1)
 
 
