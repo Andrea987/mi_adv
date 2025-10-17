@@ -1,7 +1,10 @@
 import numpy as np
 from sklearn.impute import SimpleImputer
+from itertools import product
 
 
+def generate_binary_arrays(n):
+    return np.array(list(product([0, 1], repeat=n)))
 
 def best_predictor(X, coeff, y):
   hat_y = (X @ coeff).T  # (n, d) @ (d, m) = (n, m)
@@ -40,6 +43,23 @@ def initialize(info):
         res = imp_constant.fit_transform(X_nan)
     return res
 
+
+
+def nb_flip(m1, m2):
+  # m1 and m2 are 0, 1 mask, 0 seen, 1 missing. 
+  # Count the number of components that do not match
+  return np.sum(m1 != m2)
+
+def flip_matrix(M):
+  #print("who is M, flip matrix\n", M)
+  d, n = M.shape
+  print(n," ", d)
+  ret = np.zeros((d, d))
+  for i in range(d):
+    for j in range(d):
+      #print(i," ", j)
+      ret[i, j] = nb_flip(M[i, :], M[j, :])
+  return ret
 
 
 
