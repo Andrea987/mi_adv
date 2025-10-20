@@ -33,11 +33,12 @@ def multiple_imputation(info_mi, X_nan):
     print("info mi", info_mi)
     nbr_mi = info_mi['mi_nbr']
     nbr_feature = info_mi['nbr_feature']
+    max_iter = info_mi['max_iter'] if 'max_iter' in info_mi.keys() else d
     res = np.zeros((nbr_mi, n, d))
     for i in range(nbr_mi):
        n_i = np.random.randint(0, 100000)
        print("nbr features ", nbr_feature)
-       ice = IterativeImputer(random_state=n_i, max_iter=50, sample_posterior=True, n_nearest_features=nbr_feature)
+       ice = IterativeImputer(random_state=n_i, max_iter=max_iter, sample_posterior=True, n_nearest_features=nbr_feature)
        res[i, :, :] = ice.fit_transform(X_nan)
        #print("fin res shape", res.shape)
        #if nbr_mi == 1:
