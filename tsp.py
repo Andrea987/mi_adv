@@ -371,6 +371,7 @@ end2 = time.time()     # toc
 print(f"Elapsed time no 1 simple imputer  prec: {end2 - start2:.4f} seconds")
 
 print("ciao")
+print("ciao 2")
 start3 = time.time()   # tic
 #res2 = multiple_imputation({'mi_nbr':1, 'nbr_feature':None, 'max_iter': d * R}, X_nan)
 #print(res2)
