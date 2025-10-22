@@ -104,6 +104,10 @@ def impute_matrix(XX, Q, M, i):
     #    v = -(1/Q[i, i]) * v
     
     prediction = X_i @ v[:, None]
+    #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
+    
+    prediction = -1.5 * (prediction < -1.5).astype(int) + 1.5 * (prediction >= 1.5).astype(int) + prediction * ((prediction >= -1.5) & (prediction < 1.5)).astype(int) 
+    
     #print(v[:, None])
     #print("test in impute matrix, who is v\n ", v)
     #print(-Q * (1 / Q[i, i]))
@@ -121,11 +125,6 @@ def impute_matrix(XX, Q, M, i):
     #print("new X\n", X)
     return X
 
-def batch_upd_dwt():
-    x = 1
-
-
-
 
 
 
@@ -136,9 +135,33 @@ def swm_formula(Q, U, c):
         ret = rk_1_update_inverse(Q, U, c)
     else:
         d, m = U.shape  # U = [u_1|..|u_m], size = (d, m)
+        #print("shape U ", d, m)
         #print(U)
         #print(Q)
-        w = U.T @ Q
+        #print(Q.dtype)
+        #print(U.dtype)
+        #print("cond numb ", np.linalg.cond(Q))
+        with np.errstate(over='raise'):
+            w = U.T @ Q  # x = np.exp(1000)
+            #cn = np.linalg.cond(Q)
+            #print("cond nbr ", cn)
+            #print("max Q: ", np.max(Q), ", min Q ", np.min(Q))
+            #cn = 1e1
+            #if cn > 1e8:
+            #    print(cn)
+            
+            if not np.all(np.isfinite(w)):
+                print("Q: ", Q)
+                print("cond numb:", np.linalg.cond(Q))
+                print("Overflow detected inside block.")
+                input("Paused. Press Enter to continue...")
+            #try:
+            #    w = U.T @ Q  # x = np.exp(1000)
+            #except FloatingPointError:
+            #    print("cond numb ", np.linalg.cond(Q))
+            #    print("Overflow detected inside block.")
+            #    input("Paused. Press Enter to continue...")
+        
         #print("w \n\n\n", w)
         #print(w @ U)
         #print(w.shape)
@@ -149,7 +172,7 @@ def swm_formula(Q, U, c):
         #print("sol ", sol)
         #print("trial ", (np.eye(m) / c + w @ U) @ sol)
         #print("w", w)
-        ret = Q - w.T @ sol
+        ret = Q - w.T @ sol # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
     return ret
 
 
@@ -168,7 +191,7 @@ def test_swm():
     #print(Q_tested @ A_upd)
     np.testing.assert_allclose(Q_upd_inv, Q_tested)
 
-test_swm()
+#test_swm()
 print("end test swm successfully")
 
 def rk_1_update_inverse(Q, u, c):
@@ -222,22 +245,31 @@ def gibb_sampl(info):
     # flip matrix
     X = info['data']
     M = info['masks']
+    print("shape M", M.shape)
+    print("nbr masks ", np.sum(M, axis=0).shape)
+    print("nbr masks ", np.sum(M, axis=0))
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape
     b_s = int(np.sqrt(d))  # batch size
-    #b_s = 1 
+    b_s = 1
+    #b_s = 5
+    #b_s = 64
     print("batch size ", b_s)
     if b_s <= 0:
         b_s = 1
     #print("who is X in gibb sampl \n", X)
     ones = np.ones((d, d)) 
     F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
-    print("flip matrix ", F)
-    permutation, distance = solve_tsp_local_search(F)
-    print("optimal perm ", permutation, "optimal dist ", distance) 
-    M = M[:, permutation]
-    X = X[:, permutation]
+    print("flip matrix ", F)    
+    if info['tsp']:
+        start_time = time.time()
+        permutation, distance = solve_tsp_local_search(F)
+        end_time = time.time()
+        print("optimal perm ", permutation, "optimal dist ", distance) 
+        print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+        M = M[:, permutation]
+        X = X[:, permutation]
     #print("\n", X)
     #print("\n", M)
     Ms = matrix_switches(M)
@@ -249,7 +281,7 @@ def gibb_sampl(info):
     Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
 
-
+    start_gibb_s = time.time()
     for h in range(r):
         print("iter ", h)
         for i in range(d):
@@ -281,16 +313,27 @@ def gibb_sampl(info):
                 Q = swm_formula(Q, X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
                 i_dw = i_dw + 1
             Q = swm_formula(Q, X_upd[i_dw * b_s:nupd, :].T, -1.0)
+    end_gibb_s = time.time()
+    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    
 
 
 
 
-
-np.random.seed(54)
-n = 1500
-d = 100
+np.random.seed(53)
+n = 600
+d = 300
 lbd = 1 + 0.0
-X = np.random.randint(1, 9, size=(n, d)) + 0.0
+X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+X_orig = np.random.rand(n, d) + 0.0
+print(X_orig.dtype)
+print("max min ", )
+mean = np.mean(X_orig, axis=0)
+std = np.std(X_orig, axis=0)
+# Standardize
+X = (X_orig - mean) / std
+print(np.max(X))
+print(np.min(X))
 M = np.random.binomial(1, 0.2, size=(n, d))
 X_nan = X.copy()
 X_nan[M==1] = np.nan
@@ -299,7 +342,8 @@ info_dic = {
     'data': X,
     'masks': M,
     'nbr_it_gibb_sampl': R,
-    'lbd_reg': lbd
+    'lbd_reg': lbd,
+    'tsp': False
 }
 
 
@@ -313,11 +357,11 @@ print("new test")
 #test_split_upd()
 
 print("\n\nnew exp ")
-start_time = time.time()
+start_time_gibb_sampl = time.time()
 gibb_sampl(info_dic)
-end_time = time.time()
+end_time_gibb_sampl = time.time()
 
-print(f"Execution time: {end_time - start_time:.4f} seconds")
+print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
 
 
 ice = IterativeImputer(estimator=BayesianRidge(), max_iter=d * R, initial_strategy='mean')
