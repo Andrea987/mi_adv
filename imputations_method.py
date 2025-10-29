@@ -33,7 +33,8 @@ def multiple_imputation(info_mi, X_nan):
     print("info mi", info_mi)
     nbr_mi = info_mi['mi_nbr']
     nbr_feature = info_mi['nbr_feature']
-    max_iter = info_mi['max_iter'] if 'max_iter' in info_mi.keys() else d
+    max_iter = info_mi['max_iter'] if 'max_iter' in info_mi.keys() else 1
+    print("max iter in multiple imputation")
     res = np.zeros((nbr_mi, n, d))
     for i in range(nbr_mi):
        n_i = np.random.randint(0, 100000)

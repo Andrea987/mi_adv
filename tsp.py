@@ -105,8 +105,8 @@ def impute_matrix(XX, Q, M, i):
     
     prediction = X_i @ v[:, None]
     #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
-    
-    prediction = -1.5 * (prediction < -1.5).astype(int) + 1.5 * (prediction >= 1.5).astype(int) + prediction * ((prediction >= -1.5) & (prediction < 1.5)).astype(int) 
+    thr = 1.8
+    prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
     
     #print(v[:, None])
     #print("test in impute matrix, who is v\n ", v)
@@ -251,17 +251,17 @@ def gibb_sampl(info):
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape
-    b_s = int(np.sqrt(d))  # batch size
-    b_s = 1
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
     #b_s = 5
-    #b_s = 64
+    b_s = 64
     print("batch size ", b_s)
     if b_s <= 0:
         b_s = 1
     #print("who is X in gibb sampl \n", X)
     ones = np.ones((d, d)) 
     F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
-    print("flip matrix ", F)    
+    print("flip matrix ", F)
     if info['tsp']:
         start_time = time.time()
         permutation, distance = solve_tsp_local_search(F)
@@ -277,13 +277,19 @@ def gibb_sampl(info):
     #print("\n ", first_mask)
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
-    #print("first set vct shape ", R.shape)
+    print("first set vct shape ", R.shape)
     Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
 
     start_gibb_s = time.time()
     for h in range(r):
-        print("iter ", h)
+        #print("iter ", h)
+        if info['recomputation']:
+            R = X[first_mask == 0, :]
+            #print("first set vct ", R)
+            print("first set vct shape ", R.shape)
+            Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
+            Q = np.linalg.inv(Rt_R)
         for i in range(d):
             #print("index ", i)
             X = impute_matrix(X, Q, M, i)
@@ -304,15 +310,20 @@ def gibb_sampl(info):
             
             i_up = 0
             while (i_up + 1) * b_s < nupd:
+                #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
                 Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
                 i_up = i_up + 1
             Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
-
+            #print("cond nub Q before dwd: ", np.linalg.cond(Q))
             i_dw = 0
-            while (i_dw + 1) * b_s < nupd:
+            while (i_dw + 1) * b_s < ndwd:
+                #print("current max ", (i_dw + 1) * b_s, "total nbr dw ", ndwd)
+                #print("shape dwd ", X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].shape)
                 Q = swm_formula(Q, X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
                 i_dw = i_dw + 1
-            Q = swm_formula(Q, X_upd[i_dw * b_s:nupd, :].T, -1.0)
+            #print("outside the cycle ", i_dw * b_s)
+            Q = swm_formula(Q, X_upd[i_dw * b_s:ndwd, :].T, -1.0)
+            #print("cond nub Q: ", np.linalg.cond(Q))
     end_gibb_s = time.time()
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     
@@ -321,8 +332,8 @@ def gibb_sampl(info):
 
 
 np.random.seed(53)
-n = 600
-d = 300
+n = 8000
+d = 20
 lbd = 1 + 0.0
 X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
 X_orig = np.random.rand(n, d) + 0.0
@@ -337,13 +348,14 @@ print(np.min(X))
 M = np.random.binomial(1, 0.2, size=(n, d))
 X_nan = X.copy()
 X_nan[M==1] = np.nan
-R = 3
+R = 50
 info_dic = {
     'data': X,
     'masks': M,
     'nbr_it_gibb_sampl': R,
     'lbd_reg': lbd,
-    'tsp': False
+    'tsp': False,
+    'recomputation': False
 }
 
 
@@ -364,16 +376,15 @@ end_time_gibb_sampl = time.time()
 print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
 
 
-ice = IterativeImputer(estimator=BayesianRidge(), max_iter=d * R, initial_strategy='mean')
+ice = IterativeImputer(estimator=BayesianRidge(), max_iter=R, initial_strategy='mean')
 start2 = time.time()   # tic
-res1 = ice.fit_transform(X_nan)
+#res1 = ice.fit_transform(X_nan)
 end2 = time.time()     # toc
 print(f"Elapsed time no 1 simple imputer  prec: {end2 - start2:.4f} seconds")
 
 print("ciao")
-print("ciao 2")
 start3 = time.time()   # tic
-#res2 = multiple_imputation({'mi_nbr':1, 'nbr_feature':None, 'max_iter': d * R}, X_nan)
+res2 = multiple_imputation({'mi_nbr':1, 'nbr_feature':None, 'max_iter': R}, X_nan)
 #print(res2)
 end3 = time.time()     # toc
 print(f"Elapsed time no 2 iter imputer  prec: {end3 - start3:.4f} seconds")
