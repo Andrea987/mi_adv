@@ -19,24 +19,25 @@ from my_bayes import BayesianRidge as my_br
 def bayesian_ridge_solver(max_iter, Q):
     #  Q = (omega * Id + X.T@X)ˆ(-1) 
     for iter_ in range(max_iter):
-
+        x=1
 
         
         
 
 
 np.random.seed(53)
-n = 80
-d = 8
+n = 5
+d = 3
 lbd = 1 + 0.0
 X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-X_orig = np.random.rand(n, d) + 0.0
+#X_orig = np.random.rand(n, d) + 0.0
 print(X_orig.dtype)
 print("max min ", )
 mean = np.mean(X_orig, axis=0)
 std = np.std(X_orig, axis=0)
 # Standardize
-X = (X_orig - mean) / std
+#X = (X_orig - mean) / std
+X = X_orig
 print(np.max(X))
 print(np.min(X))
 M = np.random.binomial(1, 0.2, size=(n, d))
@@ -61,9 +62,8 @@ info_dic = {
 
 
 def br_gibb_sampling(info):
-    a = info['alpha_init']
-    l = info['lambda_init']
-
+    alpha_ = info['alpha_init']
+    lambda_ = info['lambda_init']
     X = info['data']
     M = info['masks']
     print("shape M", M.shape)
@@ -74,14 +74,17 @@ def br_gibb_sampling(info):
     n, d = X.shape
     Ms = matrix_switches(M)
     first_mask = M[:, 0]
-    #print("\n ", first_mask)
+    print("\n ", first_mask)
+    print("X\n", X)
     R = X[first_mask == 0, :]
-    #print("first set vct ", R)
+    print("first set vct \n", R)
     print("first set vct shape ", R.shape)
-    Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
+    omega_ = lambda_ / alpha_
+    Rt_R = R.T @ R + omega_ * np.eye(d)
     Q = np.linalg.inv(Rt_R)
 
 
+br_gibb_sampling(info_dic)
 
 
 
@@ -106,13 +109,13 @@ end3 = time.time()     # toc
 print(f"Elapsed time no 2 iter imputer  prec: {end3 - start3:.4f} seconds")
 
 
-clf1 = BayesianRidge()
-clf1.fit([[0,0], [1, 1], [2, 2]], [0, 1, 2])
-clf1.predict([[1, 1]])
+#clf1 = BayesianRidge()
+#clf1.fit([[0,0], [1, 1], [2, 2]], [0, 1, 2])
+#clf1.predict([[1, 1]])
 
-clf = my_br()
-clf.fit([[0,0], [1, 1], [2, 2]], [0, 1, 2])
-clf.predict([[1, 1]])
+#clf = my_br()
+#clf.fit([[0,0], [1, 1], [2, 2]], [0, 1, 2])
+#clf.predict([[1, 1]])
 print("end")
 
 
