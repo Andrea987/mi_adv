@@ -18,7 +18,9 @@ from sklearn.utils import _safe_indexing
 from sklearn.utils._param_validation import Interval
 from sklearn.utils.extmath import fast_logdet
 from sklearn.utils.validation import _check_sample_weight, validate_data
-
+import inspect
+print(inspect.getsourcefile(_preprocess_data))
+print(inspect.signature(_preprocess_data))
 ###############################################################################
 # BayesianRidge regression
 
@@ -822,3 +824,10 @@ class ARDRegression(RegressorMixin, LinearModel):
             sigmas_squared_data = (np.dot(X, self.sigma_) * X).sum(axis=1)
             y_std = np.sqrt(sigmas_squared_data + (1.0 / self.alpha_))
             return y_mean, y_std
+
+
+
+
+
+
+

@@ -1,6 +1,6 @@
 import numpy as np
 from python_tsp.heuristics import solve_tsp_local_search
-from utils import flip_matrix, generate_binary_arrays
+from utils import flip_matrix, generate_binary_arrays, matrix_switches, swm_formula, rk_1_update_inverse
 from sklearn.linear_model import Ridge
 from sklearn.impute import SimpleImputer
 from sklearn.experimental import enable_iterative_imputer
@@ -35,16 +35,6 @@ print(permutation, distance)
 print(permutation)
 print(X)
 
-def matrix_switches(M):
-    # this matrix encode which vectors should move
-    # from one side to the other
-    #M1 = M.copy()
-    #m1 = M1[0, :]
-    #M[0, :] = M[-1, :]
-    #M[-1, :] = m1
-    M1 = np.roll(M, -1, axis=1)
-    #print(M1)
-    return M - M1
 
 Ms = matrix_switches(M)
 print(Ms)
@@ -332,8 +322,8 @@ def gibb_sampl(info):
 
 
 np.random.seed(53)
-n = 8000
-d = 20
+n = 80
+d = 8
 lbd = 1 + 0.0
 X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
 X_orig = np.random.rand(n, d) + 0.0

@@ -65,6 +65,80 @@ def flip_matrix(M):
 
 
 
+def swm_formula(Q, U, c):
+    # sherman woodbury morrison formula
+    # compute the inverse of (Q + c*U.T@U)ˆ(-1)
+    if U.ndim == 1 or U.shape[0] == 1 or U.shape[1] == 1:
+        ret = rk_1_update_inverse(Q, U, c)
+    else:
+        d, m = U.shape  # U = [u_1|..|u_m], size = (d, m)
+        #print("shape U ", d, m)
+        #print(U)
+        #print(Q)
+        #print(Q.dtype)
+        #print(U.dtype)
+        #print("cond numb ", np.linalg.cond(Q))
+        with np.errstate(over='raise'):
+            w = U.T @ Q  # x = np.exp(1000)
+            #cn = np.linalg.cond(Q)
+            #print("cond nbr ", cn)
+            #print("max Q: ", np.max(Q), ", min Q ", np.min(Q))
+            #cn = 1e1
+            #if cn > 1e8:
+            #    print(cn)
+            
+            if not np.all(np.isfinite(w)):
+                print("Q: ", Q)
+                print("cond numb:", np.linalg.cond(Q))
+                print("Overflow detected inside block.")
+                input("Paused. Press Enter to continue...")
+            #try:
+            #    w = U.T @ Q  # x = np.exp(1000)
+            #except FloatingPointError:
+            #    print("cond numb ", np.linalg.cond(Q))
+            #    print("Overflow detected inside block.")
+            #    input("Paused. Press Enter to continue...")
+        
+        #print("w \n\n\n", w)
+        #print(w @ U)
+        #print(w.shape)
+        #print(U.shape)
+        #cc, low = cho_factor(np.eye(m) / c + w @ U)
+        #sol = cho_solve((cc, low), w)
+        sol = np.linalg.solve(np.eye(m) / c + w @ U, w)
+        #print("sol ", sol)
+        #print("trial ", (np.eye(m) / c + w @ U) @ sol)
+        #print("w", w)
+        ret = Q - w.T @ sol # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
+    return ret
+
+
+
+def rk_1_update_inverse(Q, u, c):
+    #print(Q)
+    #print("u in rk. upd inverse ", u.ndim)
+    if u.ndim > 1:
+        #print("vector squeezed in rk 1 upd")
+        u = np.squeeze(u)
+    w = Q @ u
+    #print(Q)
+    #print(u)
+    #print(w)
+    return Q - np.outer(w, w) / (1/c + np.sum(u * w))
+
+
+
+def matrix_switches(M):
+    # this matrix encode which vectors should move
+    # from one side to the other
+    #M1 = M.copy()
+    #m1 = M1[0, :]
+    #M[0, :] = M[-1, :]
+    #M[-1, :] = m1
+    M1 = np.roll(M, -1, axis=1)
+    #print(M1)
+    return M - M1
+
 
 
 
