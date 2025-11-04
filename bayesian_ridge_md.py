@@ -1,17 +1,23 @@
 import numpy as np
 import time
-from python_tsp.heuristics import solve_tsp_local_search
-from utils import flip_matrix, generate_binary_arrays, matrix_switches, rk_1_update_inverse, swm_formula
-from sklearn.linear_model import Ridge
-from sklearn.impute import SimpleImputer
-from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import IterativeImputer
-from scipy.sparse.linalg import LinearOperator, cg
+import sys
+#sys.path.insert(0, '/home/user/projects/sklearn_dev')  # NOT /sklearn_dev/sklearn
+#sys.path.insert(0, '/Users/abasteri/git_projects/mi_adv/sklearn_dev')
 from sklearn.linear_model import BayesianRidge
+from sklearn import sklearn
+print("Using sklearn from:", sklearn.__file__)
+
+from python_tsp.heuristics import solve_tsp_local_search
+#from utils import flip_matrix, generate_binary_arrays, matrix_switches, rk_1_update_inverse, swm_formula
+#from sklearn.linear_model import Ridge, BayesianRidge
+#from sklearn.impute import SimpleImputer
+#from sklearn.experimental import enable_iterative_imputer
+#from sklearn.impute import IterativeImputer
+from scipy.sparse.linalg import LinearOperator, cg
+#from sklearn.linear_model import BayesianRidge
 from imputations_method import multiple_imputation
 from scipy.linalg import cho_factor, cho_solve, eigh
-from my_bayes import BayesianRidge as my_br
-
+#from my_bayes import BayesianRidge as my_br
 
 ## inspired by sklearn BayesianRidge()
 
@@ -22,22 +28,64 @@ def update_gamma_alpha_lambda():
     alpha_ = (sw_sum - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
 
 
+def test_bayesian_ridge_solver():
+    clf = BayesianRidge()
+    max_iter0 = 2
+    n, d = 5, 3
+    XX = np.random.randint(0, 6, size=(n, d))
+    yy = np.random.randint(0, 6, n)
+    RR = np.column_stack((yy, XX))
+    eig_vl, eig_vc = eigh(RR.T @ RR)  # v.T @ A @ v = L -> A = v @ L @ v.T
+    spectral_dec0 = {'eig_vl': eig_vl, 'eig_vc': eig_vc}
+    print(XX)
+    print(yy)
+    clf = BayesianRidge(fit_intercept=False, alpha_init=1.0, max_iter=max_iter0)
+    clf.fit(XX, yy)
+    coeff = clf.coef_
+    print("alpha ", clf.alpha_)
+    print("lambda ", clf.lambda_)
+    print("sklearn implementation ", coeff)
+
+    coefff, _ = bayesian_ridge_solver(max_iter=max_iter0, R=RR, spectral_dec=spectral_dec0, omega=1.0, feature=0)
+    print("our implementation : ", coefff)
+
 
 def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
     # Q = (omega * Id + X.T@X)
+    n, d = R.shape
+    sw_sum = d
+    alpha_, lambda_ = 1, 1
+    alpha_1 = 1.0e-6
+    alpha_2 = 1.0e-6
+    lambda_1 = 1.0e-6
+    lambda_2 = 1.0e-6
     eig_vl, eig_vc = spectral_dec['eig_vl'], spectral_dec['eig_vc']
     v = eig_vc.T[:, feature]
-    vv = eig_vc @ (v / eig_vl)
-    coef_ = np.delete(vv, feature) / (vv[feature] + 1/omega)
-    R_i = np.delete(R, feature, axis=1)
-    R_i_seen = R_i[:, feature]
-    for iter_ in range(max_iter):
-        #v = np.zeros(d-1)
-        #v = -(1 / Q[i, i]) * Q_i[:, i]        
-        prediction = R_i @ v[:, None]
+    for iter_ in range(max_iter):    
+        vv = eig_vc @ (v / (eig_vl + omega))
+        coef_ = -np.delete(vv, feature) / vv[feature]
+        print("coeff in my fct ", coef_)
+        R_i = np.delete(R, feature, axis=1)
+        R_i_seen = R_i[:, feature]
         sse_ = np.sum((R_i_seen - np.dot(R_i, coef_)) ** 2)
         
+        gamma_ = np.sum((alpha_ * eig_vl) / (lambda_ + alpha_ * eig_vl))
+        lambda_ = (gamma_ + 2 * lambda_1) / (np.sum(coef_**2) + 2 * lambda_2)
+        alpha_ = (sw_sum - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
+        print("gamma ", gamma_, "lambda ", gamma_, "alpha ", alpha_)
+        omega = lambda_ / alpha_
+        #print("alpha my fct ", alpha_)
+        #print("lambd my fct ", lambda_)
+
+    
+    vv = eig_vc @ (v / (eig_vl + omega))
+    coef_ = -np.delete(vv, feature) / vv[feature]
+    R_i = np.delete(R, feature, axis=1)
+    R_i_seen = R_i[:, feature]
+    sse_ = np.sum((R_i_seen - np.dot(R_i, coef_)) ** 2)
     return coef_, sse_
+
+
 
 
 
@@ -104,18 +152,30 @@ def br_gibb_sampling(info):
          for j in range(d):
               bayesian_ridge_solver(max_iter_br, R, spectral_dec, omega_, j)
               for iter_ in range(max_iter_br):
+                  x=1
                 # update posterior mean coef_ based on alpha_ and lambda_ and
                 # compute corresponding sse (sum of squared errors)
-                
 
 
 
+clf = BayesianRidge()
+n, d = 5, 3
+XX = np.random.randint(0, 6, size=(n, d))
+yy = np.random.randint(0, 6, n)
+RR = np.column_stack((yy, XX))
+print(XX)
+print(yy)
+print(RR)
+clf = BayesianRidge(fit_intercept=False)
+clf.fit(XX, yy)
+coeff = clf.coef_
+print(coeff)
 
+print("\nnew test\n")
+test_bayesian_ridge_solver()
 
-
-
+'''
 br_gibb_sampling(info_dic)
-
 
 ice = IterativeImputer(estimator=BayesianRidge(), max_iter=R, initial_strategy='mean')
 start2 = time.time()   # tic
@@ -138,7 +198,7 @@ print(f"Elapsed time no 2 iter imputer  prec: {end3 - start3:.4f} seconds")
 #clf.fit([[0,0], [1, 1], [2, 2]], [0, 1, 2])
 #clf.predict([[1, 1]])
 print("end")
-
+'''
 
 
 
