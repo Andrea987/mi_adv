@@ -7,6 +7,9 @@ print(w)
 s = np.allclose(A @ v - v @ np.diag(w), np.zeros((4, 4)))
 print(s)
 
+s = np.allclose(v.T @ A @ v - np.diag(w), np.zeros((4, 4)))
+
+
 
 
 

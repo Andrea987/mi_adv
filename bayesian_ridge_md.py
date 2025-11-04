@@ -16,19 +16,29 @@ from my_bayes import BayesianRidge as my_br
 ## inspired by sklearn BayesianRidge()
 
 
-def update_coeff():
-    coef_ = np.linalg.multi_dot(
-                [Vh.T, Vh / (eigen_vals_ + lambda_ / alpha_)[:, np.newaxis], XT_y]
-            )
+def update_gamma_alpha_lambda():
+    gamma_ = np.sum((alpha_ * eigen_vals_) / (lambda_ + alpha_ * eigen_vals_))
+    lambda_ = (gamma_ + 2 * lambda_1) / (np.sum(coef_**2) + 2 * lambda_2)
+    alpha_ = (sw_sum - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
 
 
-def bayesian_ridge_solver(max_iter, Q):
-    #  Q = (omega * Id + X.T@X)ˆ(-1)
+
+def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
+    # Q = (omega * Id + X.T@X)
+    eig_vl, eig_vc = spectral_dec['eig_vl'], spectral_dec['eig_vc']
+    v = eig_vc.T[:, feature]
+    vv = eig_vc @ (v / eig_vl)
+    coef_ = np.delete(vv, feature) / (vv[feature] + 1/omega)
+    R_i = np.delete(R, feature, axis=1)
+    R_i_seen = R_i[:, feature]
     for iter_ in range(max_iter):
-        coef_, sse_ = update_coef_(
-                    X, y, n_samples, n_features, XT_y, U, Vh, eigen_vals_, alpha_, lambda_
-                )
+        #v = np.zeros(d-1)
+        #v = -(1 / Q[i, i]) * Q_i[:, i]        
+        prediction = R_i @ v[:, None]
+        sse_ = np.sum((R_i_seen - np.dot(R_i, coef_)) ** 2)
         
+    return coef_, sse_
+
 
 
 np.random.seed(53)
@@ -87,11 +97,12 @@ def br_gibb_sampling(info):
     print("first set vct shape ", R.shape)
     omega_ = lambda_ / alpha_
     #Rt_R = R.T @ R + omega_ * np.eye(d)
-    eig_vl, eig_vc = eigh(R.T @ R)
+    eig_vl, eig_vc = eigh(R.T @ R)  # v.T @ A @ v = L -> A = v @ L @ v.T
+    spectral_dec = {'eig_vl': eig_vl, 'eig_vc': eig_vc}
 
     for i in range(max_iter_gs):
          for j in range(d):
-              bayesian_ridge_solver(R)
+              bayesian_ridge_solver(max_iter_br, R, spectral_dec, omega_, j)
               for iter_ in range(max_iter_br):
                 # update posterior mean coef_ based on alpha_ and lambda_ and
                 # compute corresponding sse (sum of squared errors)
