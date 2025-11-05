@@ -315,6 +315,8 @@ class BayesianRidge(RegressorMixin, LinearModel):
             vv = eig_vc @ (v / (eig_vl + omega))
             #print(vv)
             my_coef_ = -np.delete(vv, 0) / vv[0]
+            delet = np.delete(vv, 0)
+            coef_sq = np.sum(delet**2) / vv[0]
             print("my coeff   update ", my_coef_)
             if self.compute_score:
                 # compute the log marginal likelihood
