@@ -8,7 +8,7 @@ from sklearn import sklearn
 print("Using sklearn from:", sklearn.__file__)
 
 from python_tsp.heuristics import solve_tsp_local_search
-#from utils import flip_matrix, generate_binary_arrays, matrix_switches, rk_1_update_inverse, swm_formula
+from utils import flip_matrix, generate_binary_arrays, matrix_switches, rk_1_update_inverse, swm_formula
 #from sklearn.linear_model import Ridge, BayesianRidge
 #from sklearn.impute import SimpleImputer
 #from sklearn.experimental import enable_iterative_imputer
@@ -22,16 +22,11 @@ from scipy.linalg import cho_factor, cho_solve, eigh
 ## inspired by sklearn BayesianRidge()
 
 
-def update_gamma_alpha_lambda():
-    gamma_ = np.sum((alpha_ * eigen_vals_) / (lambda_ + alpha_ * eigen_vals_))
-    lambda_ = (gamma_ + 2 * lambda_1) / (np.sum(coef_**2) + 2 * lambda_2)
-    alpha_ = (sw_sum - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
-
 
 def test_bayesian_ridge_solver():
     clf = BayesianRidge()
-    max_iter0 = 2
-    n, d = 5, 3
+    max_iter0 = 500
+    n, d = 500, 10
     XX = np.random.randint(0, 6, size=(n, d))
     yy = np.random.randint(0, 6, n)
     RR = np.column_stack((yy, XX))
@@ -47,7 +42,7 @@ def test_bayesian_ridge_solver():
     print("sklearn implementation ", coeff)
 
     coefff, _ = bayesian_ridge_solver(max_iter=max_iter0, R=RR, spectral_dec=spectral_dec0, omega=1.0, feature=0)
-    print("our implementation : ", coefff)
+    print("our implementation :   ", coefff)
 
 
 def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
@@ -64,20 +59,29 @@ def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
     for iter_ in range(max_iter):    
         vv = eig_vc @ (v / (eig_vl + omega))
         coef_ = -np.delete(vv, feature) / vv[feature]
-        print("coeff in my fct ", coef_)
+        #print("....coeff in my fct ", coef_.dtype)
         R_i = np.delete(R, feature, axis=1)
-        R_i_seen = R_i[:, feature]
+        R_i_seen = R[:, feature]
         sse_ = np.sum((R_i_seen - np.dot(R_i, coef_)) ** 2)
         
-        gamma_ = np.sum((alpha_ * eig_vl) / (lambda_ + alpha_ * eig_vl))
+        delet = np.delete(vv, feature)
+        coef_sq = np.sum(delet**2) / vv[0]
+        tr_inv = np.sum(1 / (eig_vl+omega)) - vv[0] - coef_sq
+        gamma_ = omega * (vv[0] + coef_sq) + np.sum(eig_vl / (eig_vl+omega)) - 1
+        #print("inverse trace in my Bayes ", tr_inv)
+        #gamma_ = len(delet) - omega * tr_inv
+        #print("gamma::::: ", gamma_)
+        #print("gamm0::::: ", gamma0_)
+
+        #gamma_ = np.sum((alpha_ * eig_vl) / (lambda_ + alpha_ * eig_vl))
         lambda_ = (gamma_ + 2 * lambda_1) / (np.sum(coef_**2) + 2 * lambda_2)
-        alpha_ = (sw_sum - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
-        print("gamma ", gamma_, "lambda ", gamma_, "alpha ", alpha_)
+        alpha_ = (n - gamma_ + 2 * alpha_1) / (sse_ + 2 * alpha_2)
+        #print("      my sse_", sse_)
+        #print(". n  ", n)
+        #print(".....gamma ", gamma_, "lambda ", gamma_, "alpha ", alpha_)
         omega = lambda_ / alpha_
         #print("alpha my fct ", alpha_)
         #print("lambd my fct ", lambda_)
-
-    
     vv = eig_vc @ (v / (eig_vl + omega))
     coef_ = -np.delete(vv, feature) / vv[feature]
     R_i = np.delete(R, feature, axis=1)
@@ -86,8 +90,10 @@ def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
     return coef_, sse_
 
 
-
-
+def spectral_decomposition_update(spectral_dec, v, rho):
+    # update the spectral decomposition of A + rho * v @ v.T
+    eig_vl, eig_vc = spectral_dec['eig_vl'], spectral_dec['eig_vc']
+    
 
 np.random.seed(53)
 n = 5
@@ -150,11 +156,22 @@ def br_gibb_sampling(info):
 
     for i in range(max_iter_gs):
          for j in range(d):
-              bayesian_ridge_solver(max_iter_br, R, spectral_dec, omega_, j)
-              for iter_ in range(max_iter_br):
-                  x=1
-                # update posterior mean coef_ based on alpha_ and lambda_ and
-                # compute corresponding sse (sum of squared errors)
+                bayesian_ridge_solver(max_iter_br, R, spectral_dec, omega_, j)
+              
+                X = impute_matrix(X, Q, M, i)
+                N = Ms[:, i]
+                X_upd, X_dwd = split_upd(X, N)
+                nupd, ndwd = X_upd[0], X_dwd[0]
+                i_up = 0
+                while i_up < nupd:
+                    #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
+                    Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
+                    i_up = i_up + 1
+                Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
+                #print("cond nub Q before dwd: ", np.linalg.cond(Q))
+                i_dw = 0
+                while i_dw < ndwd:
+                    i_dw = i_dw + 1
 
 
 

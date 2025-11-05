@@ -310,14 +310,17 @@ class BayesianRidge(RegressorMixin, LinearModel):
             coef_, rmse_ = self._update_coef_(
                 X, y, n_samples, n_features, XT_y, U, Vh, eigen_vals_, alpha_, lambda_
             )
-            print("coef after update ", coef_)
+            #print("coef after update ", coef_.dtype)
             omega = lambda_/alpha_
             vv = eig_vc @ (v / (eig_vl + omega))
             #print(vv)
             my_coef_ = -np.delete(vv, 0) / vv[0]
             delet = np.delete(vv, 0)
             coef_sq = np.sum(delet**2) / vv[0]
-            print("my coeff   update ", my_coef_)
+            tr_inv = np.sum(1 / (eig_vl+omega)) - vv[0] - coef_sq
+            #print("inverse trace ", tr_inv)
+            #print("gamma::::: ", len(delet) - omega * tr_inv)
+            #print("my coeff   update ", my_coef_)
             if self.compute_score:
                 # compute the log marginal likelihood
                 s = self._log_marginal_likelihood(
@@ -329,8 +332,9 @@ class BayesianRidge(RegressorMixin, LinearModel):
             gamma_ = np.sum((alpha_ * eigen_vals_) / (lambda_ + alpha_ * eigen_vals_))
             lambda_ = (gamma_ + 2 * lambda_1) / (np.sum(coef_**2) + 2 * lambda_2)
             alpha_ = (n_samples - gamma_ + 2 * alpha_1) / (rmse_ + 2 * alpha_2)
-
-            print("gamma ", gamma_, "lambda ", gamma_, "alpha ", alpha_)
+            #print("n samples ", n_samples)
+            #print(".   rmse_e ", rmse_)
+            #print("gamma::::: ", gamma_, "lambda ", gamma_, "alpha ", alpha_)
             # Check for convergence
             if iter_ != 0 and np.sum(np.abs(coef_old_ - coef_)) < self.tol:
                 if verbose:
