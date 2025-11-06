@@ -5,6 +5,7 @@ import sys
 #sys.path.insert(0, '/Users/abasteri/git_projects/mi_adv/sklearn_dev')
 from sklearn.linear_model import BayesianRidge
 from sklearn import sklearn
+from scipy.optimize import root_scalar
 print("Using sklearn from:", sklearn.__file__)
 
 from python_tsp.heuristics import solve_tsp_local_search
@@ -26,7 +27,7 @@ from scipy.linalg import cho_factor, cho_solve, eigh
 def test_bayesian_ridge_solver():
     clf = BayesianRidge()
     max_iter0 = 500
-    n, d = 500, 10
+    n, d = 5, 3
     XX = np.random.randint(0, 6, size=(n, d))
     yy = np.random.randint(0, 6, n)
     RR = np.column_stack((yy, XX))
@@ -90,9 +91,106 @@ def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
     return coef_, sse_
 
 
+
+def compute_intervals(alpha, a, psi):
+    # given alpha and a such that
+    # f(lbd) = sum(a * (1/(alpha-lbd))) - psi, compute some confidence interval for the zeros of the function
+    print("ciao")
+    print("a: ", a)
+    s = np.cumsum(a)
+    ss = np.sum(a) - s
+    print("s: ", s)
+    print("ss:", ss)
+    Delta = np.delete(alpha, 0) - np.delete(alpha, -1)
+    alpha_min_first = np.delete(alpha, 0)
+    alpha_min_last = np.delete(alpha, -1)
+    a_min_first = np.delete(a, 0)
+    a_min_last = np.delete(a, -1)
+    print("Delta ", Delta)
+    print("s invers ", s[::-1][0:-1])
+    lbd_l0 = alpha_min_last + a_min_last * Delta / (a_min_last + ss[0:-1])
+    lbd_r0 = alpha_min_first - a_min_first * Delta / s[1:]  # (a_min_first + s[:-1])
+    print("alpha min last ", alpha_min_last)
+    print("a min last ", a_min_last)
+    print("a min last ", a_min_last)
+    print("s[:-1] ", s[:-1])
+    print("s[1:-1] ", s[1:])
+    print(lbd_l0)
+    if psi < 0:
+        Delta_lbdR = alpha_min_first - lbd_r0
+        lbd_l = alpha_min_last + a_min_last * Delta / (a_min_last + ss[0:-1] - psi * Delta)
+        lbd_r = alpha_min_first - (a_min_first - psi * Delta_lbdR) * Delta / (s[1:] - psi * Delta_lbdR)
+
+    return lbd_l, lbd_r
+
+def test_compute_intervals():
+    n, d = 4, 5
+    # alpha = np.random.randint(1, 5, size=d)
+    alpha = np.array([1, 3, 5, 7, 10])
+    alpha = np.sort(np.random.randn(d))
+    print("asymptos ", alpha)
+    a = np.random.randint(1, 9, size=d)
+    lbd_l, lbd_r = compute_intervals(alpha, a, -1)
+    def f(x):
+        return 1 + np.sum(a / (alpha-x))
+    print("asymptos ", alpha)
+    print("left intervals ", lbd_l)
+    print("right intervals ", lbd_r)
+    for i in range(len(lbd_l)):
+        brack = [lbd_l[i] , lbd_r[i]]
+        print(brack)
+        print(f(lbd_l[i]))
+        print(f(lbd_r[i]))
+        sol = root_scalar(f, bracket=brack, method='brentq')
+        print(f(sol.root))
+        print(sol)
+    
+
+def test_spectral_decomposition_update():
+    n, d = 9, 5
+    RR = np.random.randint(1, 7, size=(n, d))
+    A = RR.T @ RR #+ 1e-3 * np.eye(d)
+    eig_vl, eig_vc = eigh(A)  # v.T @ A @ v = L -> A = v @ L @ v.T
+    #print("eig_vl ", eig_vl)
+    v = np.random.randint(1, 3, size=d)
+    print("new vector ", v)
+    psi = -1
+    Anew = A + np.outer(v, v)
+    print("outer ", np.outer(v, v))
+    new_eig_vl, new_eig_vc = eigh(Anew)
+
+    vv = eig_vc.T @ v
+    lbd_l, lbd_r = compute_intervals(eig_vl, vv ** 2, psi)
+    def f(x):
+        return 1 + np.sum((vv ** 2) / (eig_vl-x))
+    print("asymptos ", eig_vl)
+    print("left intervals  ", lbd_l)
+    print("right intervals ", lbd_r)
+    roots = np.zeros(d)
+    for i in range(len(lbd_l)):
+        brack = [lbd_l[i] , lbd_r[i]]
+        #print(brack)
+        #print(f(lbd_l[i]))
+        #print(f(lbd_r[i]))
+        sol = root_scalar(f, bracket=brack, method='brentq')
+        #print(f(sol.root))
+        print(sol.root)
+        roots[i] = sol.root
+    sum_eig_vl = np.sum(eig_vl)
+    new_trace = np.sum(eig_vl) + np.sum(v **2)
+    roots[d-1] = new_trace - np.sum(roots)
+    print(roots)
+    print("new eigvls ", new_eig_vl)
+
+
+
+
 def spectral_decomposition_update(spectral_dec, v, rho):
     # update the spectral decomposition of A + rho * v @ v.T
     eig_vl, eig_vc = spectral_dec['eig_vl'], spectral_dec['eig_vc']
+
+
+
     
 
 np.random.seed(53)
@@ -144,8 +242,8 @@ def br_gibb_sampling(info):
     n, d = X.shape
     Ms = matrix_switches(M)
     first_mask = M[:, 0]
-    print("\n ", first_mask)
-    print("X\n", X)
+    #print("\n ", first_mask)
+    #print("X\n", X)
     R = X[first_mask == 0, :]
     print("first set vct \n", R)
     print("first set vct shape ", R.shape)
@@ -157,7 +255,6 @@ def br_gibb_sampling(info):
     for i in range(max_iter_gs):
          for j in range(d):
                 bayesian_ridge_solver(max_iter_br, R, spectral_dec, omega_, j)
-              
                 X = impute_matrix(X, Q, M, i)
                 N = Ms[:, i]
                 X_upd, X_dwd = split_upd(X, N)
@@ -180,17 +277,18 @@ n, d = 5, 3
 XX = np.random.randint(0, 6, size=(n, d))
 yy = np.random.randint(0, 6, n)
 RR = np.column_stack((yy, XX))
-print(XX)
-print(yy)
-print(RR)
+#print(XX)
+#print(yy)
+#print(RR)
 clf = BayesianRidge(fit_intercept=False)
 clf.fit(XX, yy)
 coeff = clf.coef_
-print(coeff)
+#print(coeff)
 
 print("\nnew test\n")
-test_bayesian_ridge_solver()
-
+#test_bayesian_ridge_solver()
+test_compute_intervals()
+test_spectral_decomposition_update()
 '''
 br_gibb_sampling(info_dic)
 
