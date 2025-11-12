@@ -6,7 +6,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from scipy.sparse.linalg import LinearOperator, cg
-from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import BayesianRidge, Ridge
 import time
 from imputations_method import multiple_imputation
 from scipy.linalg import cho_factor, cho_solve
@@ -92,12 +92,10 @@ def impute_matrix(XX, Q, M, i):
     #    v[0:i] = Q[0:i, 0]
     #    v[(i+1):d] = Q[(i+1):d, 0]
     #    v = -(1/Q[i, i]) * v
-    
     prediction = X_i @ v[:, None]
     #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
-    thr = 1.8
-    prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
-    
+    #thr = 1.8
+    #prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
     #print(v[:, None])
     #print("test in impute matrix, who is v\n ", v)
     #print(-Q * (1 / Q[i, i]))
@@ -113,7 +111,7 @@ def impute_matrix(XX, Q, M, i):
     #X[:, i] = X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i]
     #X[:, i] = np.zeros_like(X[:, i])
     #print("new X\n", X)
-    return X
+    return X, v  # imputed matrix, coeff
 
 
 
@@ -197,7 +195,6 @@ def rk_1_update_inverse(Q, u, c):
     return Q - np.outer(w, w) / (1/c + np.sum(u * w))
 
     
-
 def test_rk_1_update_inverse():
     n, d, c = 5, 3, -0.345
     X = np.random.randint(1, 5, size =(n, d))  + 0.0
@@ -212,29 +209,39 @@ def test_rk_1_update_inverse():
     np.testing.assert_allclose(Q_upd_inv, Q_tested)
 
 
-def test_impute_matrix(X, M):
-    n, d = X.shape
-    print("masks ", M)
+def test_impute_matrix():
+    print("beginning test impute matrix ")
+    n, d = 30, 9
+    X = np.random.randint(1, 5, size=(n, d))
+    M = np.random.binomial(1, 0.2, size=(n, d))
+    print("masks in test impute matrix\n", M)
     for i in range(d):
         xi = X[:, i]
         X_i = np.delete(X, i, axis=1)
-        alpha = 1.563
+        alpha = 0.3213
         #Q = np.linalg.inv(X_i.T @ X_i + alpha * np.eye(d-1))
         Q = np.linalg.inv(X.T @ X + alpha * np.eye(d))
         clf = Ridge(alpha=alpha, fit_intercept=False)
         clf.fit(X_i, xi)
-        X = impute_matrix(X, Q, M, i)
-        print(clf.coef_)
-    print("masks\n ", M)
+        X, my_coeff = impute_matrix(X, Q, M, i)
+        #print("my coeff from Ridge  ", my_coeff)
+        #print("coeff from Ridge fit ", clf.coef_)
+        np.testing.assert_allclose(my_coeff, clf.coef_)
+    #print("masks in test impute matrix\n", M)
+    print("test impute matrix ended successfully")
 
-
-
+test_impute_matrix()
 
 
 def gibb_sampl(info):
     # flip matrix
     X = info['data']
     M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample \n", X)
     print("shape M", M.shape)
     print("nbr masks ", np.sum(M, axis=0).shape)
     print("nbr masks ", np.sum(M, axis=0))
@@ -244,14 +251,14 @@ def gibb_sampl(info):
     #b_s = int(np.sqrt(d))  # batch size  
     #b_s = 10
     #b_s = 5
-    b_s = 64
+    b_s = 1
     print("batch size ", b_s)
     if b_s <= 0:
         b_s = 1
     #print("who is X in gibb sampl \n", X)
     ones = np.ones((d, d)) 
     F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
-    print("flip matrix ", F)
+    #print("flip matrix\n", F)
     if info['tsp']:
         start_time = time.time()
         permutation, distance = solve_tsp_local_search(F)
@@ -268,77 +275,135 @@ def gibb_sampl(info):
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
     print("first set vct shape ", R.shape)
-    Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
+    Rt_R = R.T @ R + lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
 
     start_gibb_s = time.time()
+
     for h in range(r):
         #print("iter ", h)
         if info['recomputation']:
             R = X[first_mask == 0, :]
             #print("first set vct ", R)
             print("first set vct shape ", R.shape)
-            Rt_R = R.T @ R + (1/n) * lbd * np.eye(d)
+            Rt_R = R.T @ R + lbd * np.eye(d)
             Q = np.linalg.inv(Rt_R)
         for i in range(d):
             #print("index ", i)
-            X = impute_matrix(X, Q, M, i)
+            X, _ = impute_matrix(X, Q, M, i)
             N = Ms[:, i]
             X_upd, X_dwd = split_upd(X, N)
             #print(N)
             #print("sequence of print")
-            #print(X)
+            if info['verbose'] > 0:
+                print(X)
             #print(X_upd)
             #print(X_dwd)
             nupd, _ = X_upd.shape
             ndwd, _ = X_dwd.shape
+
+            #print("nbr update ", nupd)
+            #print("nbr dwdate ", ndwd)
             
-            #for i_up in range(nupd):
-            #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
-            #for i_dw in range(ndwd):
-            #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
+            for i_up in range(nupd):
+                Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+            for i_dw in range(ndwd):
+                Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
             
-            i_up = 0
-            while (i_up + 1) * b_s < nupd:
+            #i_up = 0
+            #while (i_up + 1) * b_s < nupd:
                 #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
-                Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
-                i_up = i_up + 1
-            Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
+            #    Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
+            #    i_up = i_up + 1
+            #Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
             #print("cond nub Q before dwd: ", np.linalg.cond(Q))
-            i_dw = 0
-            while (i_dw + 1) * b_s < ndwd:
+            #i_dw = 0
+            #while (i_dw + 1) * b_s < ndwd:
                 #print("current max ", (i_dw + 1) * b_s, "total nbr dw ", ndwd)
                 #print("shape dwd ", X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].shape)
-                Q = swm_formula(Q, X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
-                i_dw = i_dw + 1
+            #    Q = swm_formula(Q, X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
+            #    i_dw = i_dw + 1
             #print("outside the cycle ", i_dw * b_s)
-            Q = swm_formula(Q, X_upd[i_dw * b_s:ndwd, :].T, -1.0)
-            #print("cond nub Q: ", np.linalg.cond(Q))
+            #Q = swm_formula(Q, X_upd[i_dw * b_s:ndwd, :].T, -1.0)
+            #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
     end_gibb_s = time.time()
+    #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    return X
+
+def test_gibb_sampl():
+    # the test consists in running IterativeImputer with Ridge Regression,
+    # and our handmade gibb sampling function
+    n = 100
+    d = 10
+    lbd = 2 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    #X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    print("max min ", )
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    # Standardize
+    X = (X_orig - mean) / std
+    X = X_orig
+    print(np.max(X))
+    print(np.min(X))
+    M = np.random.binomial(1, 0.5, size=(n, d))
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 2
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'verbose': 0
+    }
+    start_time_gibb_sampl = time.time()
+    X_my = gibb_sampl(info_dic)
+    end_time_gibb_sampl = time.time()
+    print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
+#    print(X_my) 
+    print("\nend my gibb sampling\n")
     
+    print("It imputer Ridge Reg")
+    ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
+    start4 = time.time()   # tic
+    res4 = ice4.fit_transform(X_nan)
+#    print("result IterativeImptuer with Ridge\n", res4)
+    end4 = time.time()     # toc
+    print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds")
+    np.testing.assert_allclose(X_my, res4)
+    print("test gibb sampl ended successfully")
+
+np.random.seed(54321)  # seed 53 ok, seed 54 no 
+
+test_gibb_sampl()
 
 
-
-
-np.random.seed(53)
-n = 80
-d = 8
+'''
+n = 8
+d = 3
 lbd = 1 + 0.0
 X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-X_orig = np.random.rand(n, d) + 0.0
+#X_orig = np.random.rand(n, d) + 0.0
 print(X_orig.dtype)
 print("max min ", )
 mean = np.mean(X_orig, axis=0)
 std = np.std(X_orig, axis=0)
 # Standardize
 X = (X_orig - mean) / std
+X = X_orig
 print(np.max(X))
 print(np.min(X))
 M = np.random.binomial(1, 0.2, size=(n, d))
 X_nan = X.copy()
 X_nan[M==1] = np.nan
-R = 50
+print("X_nan \n", X_nan)
+R = 1
 info_dic = {
     'data': X,
     'masks': M,
@@ -347,8 +412,11 @@ info_dic = {
     'tsp': False,
     'recomputation': False
 }
+'''
 
 
+
+'''
 print("new exppp, test impute matrix")
 #test_impute_matrix(X, M)
 
@@ -360,13 +428,13 @@ print("new test")
 
 print("\n\nnew exp ")
 start_time_gibb_sampl = time.time()
-gibb_sampl(info_dic)
+#gibb_sampl(info_dic)
 end_time_gibb_sampl = time.time()
 
 print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
+print("\nend my gibb sampling\n")
 
-
-ice = IterativeImputer(estimator=BayesianRidge(), max_iter=R, initial_strategy='mean')
+#ice = IterativeImputer(estimator=BayesianRidge(), max_iter=R, initial_strategy='mean')
 start2 = time.time()   # tic
 #res1 = ice.fit_transform(X_nan)
 end2 = time.time()     # toc
@@ -374,9 +442,19 @@ print(f"Elapsed time no 1 simple imputer  prec: {end2 - start2:.4f} seconds")
 
 print("ciao")
 start3 = time.time()   # tic
-res2 = multiple_imputation({'mi_nbr':1, 'nbr_feature':None, 'max_iter': R}, X_nan)
+#res2 = multiple_imputation({'mi_nbr':1, 'nbr_feature':None, 'max_iter': R}, X_nan)
 #print(res2)
 end3 = time.time()     # toc
 print(f"Elapsed time no 2 iter imputer  prec: {end3 - start3:.4f} seconds")
 
+
+print("It imputer Ridge Reg")
+ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False), max_iter=R, initial_strategy='mean', verbose=0)
+start4 = time.time()   # tic
+res4 = ice4.fit_transform(X_nan)
+print("result IterativeImptuer \n", res4)
+end4 = time.time()     # toc
+#print("res aftet Ridge \n", res4)
+print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds")
+'''
 
