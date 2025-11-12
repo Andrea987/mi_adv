@@ -211,10 +211,10 @@ def test_rk_1_update_inverse():
 
 def test_impute_matrix():
     print("beginning test impute matrix ")
-    n, d = 30, 9
+    n, d = 30, 5
     X = np.random.randint(1, 5, size=(n, d))
     M = np.random.binomial(1, 0.2, size=(n, d))
-    print("masks in test impute matrix\n", M)
+    #print("masks in test impute matrix\n", M)
     for i in range(d):
         xi = X[:, i]
         X_i = np.delete(X, i, axis=1)
@@ -242,17 +242,17 @@ def gibb_sampl(info):
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
     X = imp_mean.fit_transform(X_nan)
     #print("simple imputer in gibb sample \n", X)
-    print("shape M", M.shape)
-    print("nbr masks ", np.sum(M, axis=0).shape)
-    print("nbr masks ", np.sum(M, axis=0))
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape
     #b_s = int(np.sqrt(d))  # batch size  
     #b_s = 10
     #b_s = 5
-    b_s = 1
-    print("batch size ", b_s)
+    b_s = info['batch_size']
+    #print("batch size ", b_s)
     if b_s <= 0:
         b_s = 1
     #print("who is X in gibb sampl \n", X)
@@ -274,10 +274,10 @@ def gibb_sampl(info):
     #print("\n ", first_mask)
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
-    print("first set vct shape ", R.shape)
+    #print("first set vct shape ", R.shape)
     Rt_R = R.T @ R + lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
-
+    QQ = Q.copy()
     start_gibb_s = time.time()
 
     for h in range(r):
@@ -289,7 +289,7 @@ def gibb_sampl(info):
             Rt_R = R.T @ R + lbd * np.eye(d)
             Q = np.linalg.inv(Rt_R)
         for i in range(d):
-            #print("index ", i)
+            print("index ", i)
             X, _ = impute_matrix(X, Q, M, i)
             N = Ms[:, i]
             X_upd, X_dwd = split_upd(X, N)
@@ -302,29 +302,32 @@ def gibb_sampl(info):
             nupd, _ = X_upd.shape
             ndwd, _ = X_dwd.shape
 
-            #print("nbr update ", nupd)
-            #print("nbr dwdate ", ndwd)
+            print("nbr update ", nupd)
+            print("nbr dwdate ", ndwd)
             
             for i_up in range(nupd):
                 Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
             for i_dw in range(ndwd):
                 Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
             
-            #i_up = 0
-            #while (i_up + 1) * b_s < nupd:
+            i_up = 0
+            
+            while (i_up + 1) * b_s < nupd:
                 #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
-            #    Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
-            #    i_up = i_up + 1
-            #Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
+                QQ = swm_formula(QQ, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
+                i_up = i_up + 1
+            QQ = swm_formula(QQ, X_upd[i_up * b_s:nupd, :].T, 1.0)
             #print("cond nub Q before dwd: ", np.linalg.cond(Q))
-            #i_dw = 0
-            #while (i_dw + 1) * b_s < ndwd:
+            i_dw = 0
+            while (i_dw + 1) * b_s < ndwd:
                 #print("current max ", (i_dw + 1) * b_s, "total nbr dw ", ndwd)
                 #print("shape dwd ", X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].shape)
-            #    Q = swm_formula(Q, X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
-            #    i_dw = i_dw + 1
+                QQ = swm_formula(QQ, X_dwd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
+                i_dw = i_dw + 1
             #print("outside the cycle ", i_dw * b_s)
-            #Q = swm_formula(Q, X_upd[i_dw * b_s:ndwd, :].T, -1.0)
+            QQ = swm_formula(QQ, X_dwd[i_dw * b_s:ndwd, :].T, -1.0)
+            print("QQ\n ", QQ)
+            print("Q\n", Q)
             #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
     end_gibb_s = time.time()
     #print("res my imp \n", X)
@@ -334,11 +337,11 @@ def gibb_sampl(info):
 def test_gibb_sampl():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
-    n = 100
-    d = 10
+    n = 10
+    d = 3
     lbd = 2 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    #X_orig = np.random.rand(n, d) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
     print("max min ", )
     mean = np.mean(X_orig, axis=0)
@@ -348,7 +351,7 @@ def test_gibb_sampl():
     X = X_orig
     print(np.max(X))
     print(np.min(X))
-    M = np.random.binomial(1, 0.5, size=(n, d))
+    M = np.random.binomial(1, 0.2, size=(n, d))
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
@@ -360,6 +363,7 @@ def test_gibb_sampl():
         'lbd_reg': lbd,
         'tsp': False,
         'recomputation': False,
+        'batch_size': 2,
         'verbose': 0
     }
     start_time_gibb_sampl = time.time()
