@@ -16,6 +16,7 @@ from scipy.linalg import cho_factor, cho_solve
 
 
 np.random.seed(53)
+'''
 n = 5
 d = 3
 X = np.random.rand(n, d)
@@ -42,6 +43,30 @@ print(Ms)
 m1 = Ms[:, 0]
 vp = Ms[m1 == 1, :]
 print(vp)
+'''
+
+def make_mask_with_bounded_flip(n, d, p_seen, p_flip):
+    M = np.zeros((n, d))
+    #print(M)
+    mask = np.random.binomial(1, p_seen, size=n)
+    for i in range(d):
+        M[:, i] = mask
+        flip = np.random.binomial(1, p_flip, size=n)
+        #print(flip)
+        mask = (mask + flip) % 2
+    ones = np.ones((d, d)) 
+    F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = flip_matrix(M.T)
+    print("flip matrix in make mask with bounded flip\n", F)
+    #permutation, distance = solve_tsp_local_search(F)
+    #print(permutation, distance)
+    #print("test Flip matrix \n", FF)
+    return M        
+
+maskkk = make_mask_with_bounded_flip(n=200, d=10, p_seen=0.3, p_flip=0.1)
+#print("masksss\n", maskkk)
+
+    
 
 
 def split_upd(X, ms):
@@ -277,7 +302,6 @@ def gibb_sampl(info):
     #print("first set vct shape ", R.shape)
     Rt_R = R.T @ R + lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
-    QQ = Q.copy()
     start_gibb_s = time.time()
 
     for h in range(r):
@@ -291,43 +315,53 @@ def gibb_sampl(info):
         for i in range(d):
             #print("index ", i)
             X, _ = impute_matrix(X, Q, M, i)
-            N = Ms[:, i]
-            X_upd, X_dwd = split_upd(X, N)
-            #print(N)
-            #print("sequence of print")
-            if info['verbose'] > 0:
-                print(X)
-            #print(X_upd)
-            #print(X_dwd)
-            nupd, _ = X_upd.shape
-            ndwd, _ = X_dwd.shape
-
-            #print("nbr update ", nupd)
-            #print("nbr dwdate ", ndwd)
-            
-            #for i_up in range(nupd):
-            #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
-            #for i_dw in range(ndwd):
-            #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
-            
-            i_up = 0
-            while (i_up + 1) * b_s < nupd:
-                #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
-                Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
-                i_up = i_up + 1
-            Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
-            #print("cond nub Q before dwd: ", np.linalg.cond(Q))
-            i_dw = 0
-            while (i_dw + 1) * b_s < ndwd:
-                #print("current max ", (i_dw + 1) * b_s, "total nbr dw ", ndwd)
-                #print("shape dwd ", X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].shape)
-                Q = swm_formula(Q, X_dwd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
-                i_dw = i_dw + 1
-            #print("outside the cycle ", i_dw * b_s)
-            Q = swm_formula(Q, X_dwd[i_dw * b_s:ndwd, :].T, -1.0)
-            #print("QQ\n ", QQ)
-            #print("Q\n", Q)
-            #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+            if h < r-1 or i < d-1: 
+                N = Ms[:, i]
+                X_upd, X_dwd = split_upd(X, N)
+                #print(N)
+                #print("sequence of print")
+                if info['verbose'] > 0:
+                    print(X)
+                #print(X_upd)
+                #print(X_dwd)
+                nupd, _ = X_upd.shape
+                ndwd, _ = X_dwd.shape
+                if nupd + ndwd > n :
+                    idx = i+1 if i<d-1 else 0
+                    print(idx)
+                    R = X[M[:, idx] == 0, :]
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                else:
+                    #print("nbr update ", nupd)
+                    #print("nbr dwdate ", ndwd)
+                    #print("it ", i, "total number flip ", nupd + ndwd)
+                    
+                    #for i_up in range(nupd):
+                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+                    #for i_dw in range(ndwd):
+                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
+                
+                    i_up = 0
+                    while (i_up + 1) * b_s < nupd:
+                        #print("current max ", (i_up + 1) * b_s, "total nbr upd ", nupd)
+                        Q = swm_formula(Q, X_upd[i_up * b_s:(i_up + 1) * b_s, :].T, 1.0)
+                        i_up = i_up + 1
+                    Q = swm_formula(Q, X_upd[i_up * b_s:nupd, :].T, 1.0)
+                    #print("cond nub Q before dwd: ", np.linalg.cond(Q))
+                    i_dw = 0
+                    while (i_dw + 1) * b_s < ndwd:
+                        #print("current max ", (i_dw + 1) * b_s, "total nbr dw ", ndwd)
+                        #print("shape dwd ", X_upd[i_dw * b_s:(i_dw + 1) * b_s, :].shape)
+                        Q = swm_formula(Q, X_dwd[i_dw * b_s:(i_dw + 1) * b_s, :].T, -1.0)
+                        i_dw = i_dw + 1
+                    #print("outside the cycle ", i_dw * b_s)
+                    Q = swm_formula(Q, X_dwd[i_dw * b_s:ndwd, :].T, -1.0)
+                    #print("QQ\n ", QQ)
+                    #print("Q\n", Q)
+                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
     end_gibb_s = time.time()
     #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
@@ -336,9 +370,9 @@ def gibb_sampl(info):
 def test_gibb_sampl():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
-    n = 2000
+    n = 50000
     d = 200
-    lbd = 5 + 0.0
+    lbd = 10 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
@@ -350,7 +384,8 @@ def test_gibb_sampl():
     X = X_orig
     print(np.max(X))
     print(np.min(X))
-    M = np.random.binomial(1, 0.01, size=(n, d))
+    #M = np.random.binomial(1, 0.01, size=(n, d))
+    M = make_mask_with_bounded_flip(n=n, d=d, p_seen=0.2, p_flip=0.05)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
@@ -378,12 +413,12 @@ def test_gibb_sampl():
     res4 = ice4.fit_transform(X_nan)
 #    print("result IterativeImptuer with Ridge\n", res4)
     end4 = time.time()     # toc
-    print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds")
+    print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
     if not info_dic['tsp']:
         np.testing.assert_allclose(X_my, res4)
     print("test gibb sampl ended successfully")
 
-np.random.seed(54321)  # seed 53 ok, seed 54 no 
+np.random.seed(54321)
 
 test_gibb_sampl()
 
