@@ -142,5 +142,39 @@ def matrix_switches(M):
 
 
 
+def inverse_2_times_2_sym(A):
+    # A is a 2x2 symmetric matrix, compute the inverse
+    C = np.zeros_like(A)
+    C[0, 0] = A[1, 1]
+    C[1, 1] = A[0, 0]
+    C[0, 1] = -A[0, 1]
+    C[1, 0] = -A[1, 0]
+    detr = A[0, 0] * A[1, 1] - (A[0, 1]**2)
+    #print(C)
+    return C / detr
+
+def update_inverse_rk2_sym(A_inv, W):
+    # A_inv is the dxd symmetric inverse of the object matrix A
+    # W is the matrix (u|w), dx2, such that 
+    # A_new = A + uw.T + wu.T = A + W.T C W, with C = [[0, 1], [1, 0]]
+    #print("shape in update inverse ", A_inv.shape)
+    #print("shape in update inverse 2 ", W.shape)
+    #print("W inside update rk 2 inverse \n", W)
+    #print("A_inv inside fct \n", A_inv)
+    WTA_inv = W.T @ A_inv
+    #print("\n ", WTA_inv)
+    WTA_invW = WTA_inv @ W
+    #print("\n", WTA_invW)
+    #print("multiplication performed")
+    C = np.array([[0, 1], [1, 0]])
+    N = C + WTA_invW
+    #print(N)
+    N = N #+ np.eye(2) * 1e-8
+    N_inv = inverse_2_times_2_sym(N)
+    #print(N_inv)
+    res = A_inv - WTA_inv.T @ N_inv @ WTA_inv
+    #print("res inside update 2 inv\n", res)
+    return (res + res.T) / 2
+
 
 

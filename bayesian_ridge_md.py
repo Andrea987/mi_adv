@@ -91,7 +91,6 @@ def bayesian_ridge_solver(max_iter, R, spectral_dec, omega, feature):
     return coef_, sse_
 
 
-
 def compute_intervals(alpha, a, psi):
     # given alpha and a such that
     # f(lbd) = sum(a * (1/(alpha-lbd))) - psi, compute some confidence interval for the zeros of the function

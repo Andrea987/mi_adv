@@ -1,6 +1,5 @@
 import numpy as np
 from python_tsp.heuristics import solve_tsp_local_search
-from utils import flip_matrix, generate_binary_arrays, matrix_switches, swm_formula, rk_1_update_inverse
 from sklearn.linear_model import Ridge
 from sklearn.impute import SimpleImputer
 from sklearn.experimental import enable_iterative_imputer
@@ -12,6 +11,7 @@ from imputations_method import multiple_imputation
 from scipy.linalg import cho_factor, cho_solve
 #from itertools import batched
 
+from utils import flip_matrix, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
 
 
 
@@ -45,10 +45,11 @@ vp = Ms[m1 == 1, :]
 print(vp)
 '''
 
-def make_mask_with_bounded_flip(n, d, p_seen, p_flip):
+def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     M = np.zeros((n, d))
     #print(M)
-    mask = np.random.binomial(1, p_seen, size=n)
+    mask = np.random.binomial(1, p_miss, size=n)
+    #print(mask)
     for i in range(d):
         M[:, i] = mask
         flip = np.random.binomial(1, p_flip, size=n)
@@ -63,7 +64,7 @@ def make_mask_with_bounded_flip(n, d, p_seen, p_flip):
     #print("test Flip matrix \n", FF)
     return M        
 
-maskkk = make_mask_with_bounded_flip(n=200, d=10, p_seen=0.3, p_flip=0.1)
+maskkk = make_mask_with_bounded_flip(n=200, d=10, p_miss=0.3, p_flip=0.1)
 #print("masksss\n", maskkk)
 
     
@@ -258,6 +259,72 @@ def test_impute_matrix():
 test_impute_matrix()
 
 
+def gibb_sampl_no_modification(info):
+    # flip matrix
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
+    #b_s = 5
+    b_s = info['batch_size']
+    #print("batch size ", b_s)
+    if b_s <= 0:
+        b_s = 1
+    #print("who is X in gibb sampl \n", X)
+    ones = np.ones((d, d)) 
+    F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #print("flip matrix\n", F)
+    if info['tsp']:
+        start_time = time.time()
+        permutation, distance = solve_tsp_local_search(F)
+        end_time = time.time()
+        print("optimal perm ", permutation, "optimal dist ", distance) 
+        print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+        M = M[:, permutation]
+        X = X[:, permutation]
+    #print("\n", X)
+    #print("\n", M)
+    Ms = matrix_switches(M)
+    first_mask = M[:, 0]
+    #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    R = X  # X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    Rt_R = R.T @ R + lbd * np.eye(d)
+    Q = np.linalg.inv(Rt_R)
+    start_gibb_s = time.time()
+    upd_j = np.zeros((d, 2))
+    for h in range(r):
+        #print("iter ", h)
+        for i in range(d):
+            #print("index ", i)
+            X, _ = impute_matrix(X, Q, M, i)
+            if info['verbose'] > 0:
+                print(X)
+            upd_j[i, 0] = 1
+            upd_j[:, 1] = X[]
+            
+            
+                
+    end_gibb_s = time.time()
+    #print("res my imp \n", X)
+    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    return X
+
+
+
 def gibb_sampl(info):
     # flip matrix
     X = info['data']
@@ -297,6 +364,7 @@ def gibb_sampl(info):
     Ms = matrix_switches(M)
     first_mask = M[:, 0]
     #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
@@ -326,7 +394,7 @@ def gibb_sampl(info):
                 #print(X_dwd)
                 nupd, _ = X_upd.shape
                 ndwd, _ = X_dwd.shape
-                if nupd + ndwd > n :
+                if nupd + ndwd > n: #* 0.2:
                     idx = i+1 if i<d-1 else 0
                     print(idx)
                     R = X[M[:, idx] == 0, :]
@@ -367,12 +435,19 @@ def gibb_sampl(info):
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
 
+
+
+
+
 def test_gibb_sampl():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
-    n = 50000
-    d = 200
-    lbd = 10 + 0.0
+    n = 240
+    print("sqrt n ", np.sqrt(n))
+    print("n ** (3/4)", n ** (3/4))
+    print("n ** (3/4) / n", (n ** (3/4)) / n)
+    d = 25
+    lbd = 1 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
@@ -382,10 +457,13 @@ def test_gibb_sampl():
     # Standardize
     X = (X_orig - mean) / std
     X = X_orig
+    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     print(np.max(X))
     print(np.min(X))
     #M = np.random.binomial(1, 0.01, size=(n, d))
-    M = make_mask_with_bounded_flip(n=n, d=d, p_seen=0.2, p_flip=0.05)
+    exponent = (n ** (3/4)) / n
+    print("exponent", exponent)
+    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)

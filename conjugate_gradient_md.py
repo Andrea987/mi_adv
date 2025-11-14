@@ -4,10 +4,10 @@ from sklearn.impute import SimpleImputer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from scipy.sparse.linalg import LinearOperator, cg
-from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import BayesianRidge, Ridge
 import time
 
-from utils import initialize
+from utils import initialize, inverse_2_times_2_sym, update_inverse_rk2_sym
 
 def initialize1(info):
     X = info['X']
@@ -21,40 +21,6 @@ def initialize1(info):
         res = imp_constant.fit_transform(X_nan)
     return res
 
-
-def inverse_2_times_2_sym(A):
-    # A is a 2x2 symmetric matrix, compute the inverse
-    C = np.zeros_like(A)
-    C[0, 0] = A[1, 1]
-    C[1, 1] = A[0, 0]
-    C[0, 1] = -A[0, 1]
-    C[1, 0] = -A[1, 0]
-    detr = A[0, 0] * A[1, 1] - (A[0, 1]**2)
-    #print(C)
-    return C / detr
-
-def update_inverse_rk2_sym(A_inv, W):
-    # A_inv is the dxd symmetric inverse of the object matrix A
-    # W is the matrix (u|w), dx2, such that 
-    # A_new = A + uw.T + wu.T = A + W.T C W, with C = [[0, 1], [1, 0]]
-    #print("shape in update inverse ", A_inv.shape)
-    #print("shape in update inverse 2 ", W.shape)
-    #print("W inside update rk 2 inverse \n", W)
-    #print("A_inv inside fct \n", A_inv)
-    WTA_inv = W.T @ A_inv
-    #print("\n ", WTA_inv)
-    WTA_invW = WTA_inv @ W
-    #print("\n", WTA_invW)
-    #print("multiplication performed")
-    C = np.array([[0, 1], [1, 0]])
-    N = C + WTA_invW
-    #print(N)
-    N = N + np.eye(2) * 1e-8
-    N_inv = inverse_2_times_2_sym(N)
-    #print(N_inv)
-    res = A_inv - WTA_inv.T @ N_inv @ WTA_inv
-    #print("res inside update 2 inv\n", res)
-    return (res + res.T) / 2
 
 '''
 def shift_inverse(A):
@@ -130,7 +96,7 @@ def Lin_op_mask(X_red, col_masks):
     n, d_red = X_red.shape
     #print("d red ", d_red)
     def mv(v):
-        return X_red.T @ (((1-col_masks) * X_red.T).T) @ v
+        return X_red.T @ (((1-col_masks) * X_red.T).T) @ v + v
     #print("kernel matrix with missingnesss")
     #print(X_red.T @ (((1-col_masks) * X_red.T).T))
     return LinearOperator((d_red, d_red), matvec=mv)
@@ -196,9 +162,9 @@ def sampling(info):
     K_j = X_ini_del.T @ X_ini_del  # + np.eye(d-1) * 1e-8 # (d, d)
     K_j_inv = np.linalg.inv(K_j)
     info['K_j_inv'] = K_j_inv
-    print("K j ", K_j)
-    print("K j inv ", K_j_inv)
-    print(K_j @ K_j_inv)
+    #print("K j ", K_j)
+    #print("K j inv ", K_j_inv)
+    #print(K_j @ K_j_inv)
     upd_j = np.zeros((d-1, 2))
     ptr_X = np.zeros_like(X_ini)
     print(upd_j)
@@ -242,7 +208,7 @@ def sampling(info):
             #print("det km_check", np.linalg.det(km_check))
             #print("k_jinv times K_j", K_j_inv @ K_j)
             K_j_inv = update_inverse_rk2_sym(K_j_inv, upd_j)
-            print("cond number inverse: ", np.linalg.cond(K_j_inv))
+            #print("cond number inverse: ", np.linalg.cond(K_j_inv))
             if crr_j == d-1:
                 #print("small check in the case d-1: \n", km_check @ K_j_inv)
                 #print("old inverse ", K_j_inv)
@@ -382,10 +348,16 @@ def iteration(info, crr_j):
 '''
 
 np.random.seed(42)
-n, d = 400, 100
-R = 1  # iteration MC
+n, d = 2000, 400
+R = 2  # iteration MC
 m = np.random.binomial(1, 0.4, size=(n, d))
-X = np.random.rand(n, d)
+X_orig = np.random.rand(n, d)
+mean = np.mean(X_orig, axis=0)
+std = np.std(X_orig, axis=0)
+# Standardize
+X = (X_orig - mean) / std
+X = X_orig
+X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
 X_nan = X.copy()
 X_nan[m==1] = np.nan
 print('wewew ', X_nan)
@@ -394,19 +366,19 @@ infoo = {'masks': m,
          'X': X,
          'initialize': 'mean',
          'X_nan': X_nan,
-         'it_MC': 5
+         'it_MC': R
         }
 print(infoo)
 start1 = time.time()   # tic
 res = sampling(infoo)
 end1 = time.time()     # toc
-print(f"Elapsed time no   prec: {end1 - start1:.4f} seconds")
-
-ice = IterativeImputer(estimator=BayesianRidge(), max_iter=d * R, initial_strategy='mean')
+print(f"Elapsed time sampling   prec: {end1 - start1:.4f} seconds")
+lbd = 1
+ice = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), max_iter=d * R, initial_strategy='mean')
 start2 = time.time()   # tic
 res1 = ice.fit_transform(X_nan)
 end2 = time.time()     # toc
-print(f"Elapsed time no   prec: {end2 - start2:.4f} seconds")
+print(f"Elapsed time Ridge prec: {end2 - start2:.4f} seconds")
 #print("res sampling \n", res)
 
 #print("res iter imputer \n", res1)
