@@ -49,7 +49,7 @@ def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     M = np.zeros((n, d))
     #print(M)
     mask = np.random.binomial(1, p_miss, size=n)
-    #print(mask)
+    print("first mask in make mask with bounded flip", mask)
     for i in range(d):
         M[:, i] = mask
         flip = np.random.binomial(1, p_flip, size=n)
@@ -64,10 +64,8 @@ def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     #print("test Flip matrix \n", FF)
     return M        
 
-maskkk = make_mask_with_bounded_flip(n=200, d=10, p_miss=0.3, p_flip=0.1)
+maskkk = make_mask_with_bounded_flip(n=2, d=10, p_miss=0.3, p_flip=0.1)
 #print("masksss\n", maskkk)
-
-    
 
 
 def split_upd(X, ms):
@@ -306,16 +304,27 @@ def gibb_sampl_no_modification(info):
     Q = np.linalg.inv(Rt_R)
     start_gibb_s = time.time()
     upd_j = np.zeros((d, 2))
+    print("initial X \n", X)
     for h in range(r):
         #print("iter ", h)
         for i in range(d):
-            #print("index ", i)
+            print("index gibb sampl no mod", i)
+            X_pre_upd = X
             X, _ = impute_matrix(X, Q, M, i)
+            print("new X ", X)
             if info['verbose'] > 0:
                 print(X)
             upd_j[i, 0] = 1
-            upd_j[:, 1] = X[]
-            
+            upd_j[:, 1] = X.T @ (X[:, i] - X_pre_upd[:, i])
+            upd_j[i, 1] = np.sum((X[:, i] - X_pre_upd[:, i]) * (X[:, i] + X_pre_upd[:, i])) / 2  
+            Q = update_inverse_rk2_sym(Q, upd_j)
+            upd_j[i, 0] = 0
+            QQ = X.T @ X + lbd * np.eye(d)
+            QQ = np.linalg.inv(QQ)
+            #print("small check QQ\n", QQ)
+            #print("small check Q\n", Q)
+            np.testing.assert_allclose(Q, QQ)
+    return X      
             
                 
     end_gibb_s = time.time()
@@ -323,6 +332,50 @@ def gibb_sampl_no_modification(info):
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
 
+
+def test_gibb_sampl_no_modification():
+    print("beginning test gibb samp no modification")
+    n = 7
+    print("sqrt n ", np.sqrt(n))
+    print("n ** (3/4)", n ** (3/4))
+    print("n ** (3/4) / n", (n ** (3/4)) / n)
+    d = 3
+    lbd = 1 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    #X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    print("max min ")
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    # Standardize
+    #X = (X_orig - mean) / std
+    X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    print(np.max(X))
+    print(np.min(X))
+    #M = np.random.binomial(1, 0.01, size=(n, d))
+    exponent = (n ** (3/4)) / n
+    print("exponent", exponent)
+    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
+    print("masks in test gibb sampl no modification\n", M)
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 2
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'batch_size': 64,
+        'verbose': 0
+    }
+    res = gibb_sampl_no_modification(info_dic)
+    print("test impute matrix ended successfully")
+
+test_gibb_sampl_no_modification()
 
 
 def gibb_sampl(info):
@@ -436,9 +489,6 @@ def gibb_sampl(info):
     return X
 
 
-
-
-
 def test_gibb_sampl():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
@@ -498,7 +548,7 @@ def test_gibb_sampl():
 
 np.random.seed(54321)
 
-test_gibb_sampl()
+# test_gibb_sampl()
 
 
 '''
