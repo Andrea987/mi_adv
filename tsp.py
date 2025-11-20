@@ -10,6 +10,7 @@ import time
 from imputations_method import multiple_imputation
 from scipy.linalg import cho_factor, cho_solve
 #from itertools import batched
+import matplotlib.pyplot as plt
 
 from utils import flip_matrix, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
 
@@ -334,7 +335,7 @@ def gibb_sampl_no_modification(info):
 
 
 def test_gibb_sampl_no_modification():
-    print("beginning test gibb samp no modification")
+    print("\n\nbeginning test gibb samp no modification\n")
     n = 7
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
@@ -373,11 +374,11 @@ def test_gibb_sampl_no_modification():
         'verbose': 0
     }
     res = gibb_sampl_no_modification(info_dic)
-    print("test impute matrix ended successfully")
-
-test_gibb_sampl_no_modification()
+    print("test gibb sampl no modif ended successfully")
 
 
+
+'''
 def gibb_sampl(info):
     # flip matrix
     X = info['data']
@@ -487,6 +488,106 @@ def gibb_sampl(info):
     #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
+'''
+
+def gibb_sampl(info):
+    # flip matrix
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
+    #b_s = 5
+    b_s = info['batch_size']
+    #print("batch size ", b_s)
+    if b_s <= 0:
+        b_s = 1
+    #print("who is X in gibb sampl \n", X)
+    ones = np.ones((d, d)) 
+    F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #print("flip matrix\n", F)
+    if info['tsp']:
+        start_time = time.time()
+        permutation, distance = solve_tsp_local_search(F)
+        end_time = time.time()
+        print("optimal perm ", permutation, "optimal dist ", distance) 
+        print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+        M = M[:, permutation]
+        X = X[:, permutation]
+    #print("\n", X)
+    #print("\n", M)
+    Ms = matrix_switches(M)
+    first_mask = M[:, 0]
+    #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    R = X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    Rt_R = R.T @ R + lbd * np.eye(d)
+    Q = np.linalg.inv(Rt_R)
+    start_gibb_s = time.time()
+
+    for h in range(r):
+        for i in range(d):
+            #print("index ", i)
+            X, _ = impute_matrix(X, Q, M, i)
+            #print("who is X \n", X)
+            #v = X.T @ X[:, i]
+            #Rt_R[i, :] = v
+            #Rt_R[:, i] = v
+            #Rt_R
+            #print("who is Rt_R \n", Rt_R)
+            if h < r-1 or i < d-1:
+                N = Ms[:, i]
+                X_upd, X_dwd = split_upd(X, N)
+                #print(N)
+                #print("sequence of print")
+                if info['verbose'] > 0:
+                    print(X)
+                #print(X_upd)
+                #print(X_dwd)
+                nupd, _ = X_upd.shape
+                ndwd, _ = X_dwd.shape
+                '''
+                if nupd + ndwd > n:
+                    idx = i+1 if i<d-1 else 0
+                    print(idx)
+                    R = X[M[:, idx] == 0, :]
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                '''
+                Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                #print("nupd + nded ", nupd + ndwd)
+                if nupd + ndwd > d:
+                    idx = i+1 if i<d-1 else 0
+                    #print(idx)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    #Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                else:
+                    Q = swm_formula(Q, X_upd.T, 1.0)
+                    Q = swm_formula(Q, X_dwd.T, -1.0)
+                    #print("QQ\n ", QQ)
+                    #print("Q\n", Q)
+                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+    end_gibb_s = time.time()
+    #print("res my imp \n", X)
+    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    return X
 
 
 def test_gibb_sampl():
@@ -542,13 +643,111 @@ def test_gibb_sampl():
 #    print("result IterativeImptuer with Ridge\n", res4)
     end4 = time.time()     # toc
     print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-    if not info_dic['tsp']:
-        np.testing.assert_allclose(X_my, res4)
+    #if not info_dic['tsp']:
+    np.testing.assert_allclose(X_my, res4)
     print("test gibb sampl ended successfully")
 
 np.random.seed(54321)
+test_gibb_sampl_no_modification()
 
-# test_gibb_sampl()
+
+def plot_some_graph():
+    print("\n\nstarting plot some graph()\n")
+#    list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
+#    list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
+    #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
+    #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    list_n = [500, 1000, 1500, 2000]
+    list_d = [50, 100, 150, 200]
+    lbd = 1 + 0.0
+    n, d = list_n[-1], list_d[-1]
+    print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
+    print("n ** (3/4)", n ** (3/4))
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    print("max min ")
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    # Standardize
+    X = (X_orig - mean) / std
+    X = X_orig
+    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    print(np.max(X))
+    print(np.min(X))
+    #M = np.random.binomial(1, 0.01, size=(n, d))
+    exponent = (n ** (3/4)) / n
+    print("exponent", exponent)
+    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
+    #M = np.random.binomial(n=1, p=0.5, size= (n, d))
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 2
+    total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
+    total_time_ridge = np.zeros_like(total_time_gibb_sampl)
+    for i, d_i in enumerate(list_d):
+        print("\ncurrent dimension ", d_i)
+        for j, n_j in enumerate(list_n):
+            print("\n\n current size ", n_j)
+            ones = np.ones((d_i, d_i))
+            MM = M[0:n_j, 0:d_i]
+            F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
+            #FF = flip_matrix(M.T)
+            print("flip matrix in make mask with bounded flip\n", F[0:4, 0:4])
+            info_dic = {
+                'data': X[0:n_j, 0:d_i],
+                'masks': M[0:n_j, 0:d_i],
+                'nbr_it_gibb_sampl': R,
+                'lbd_reg': lbd,
+                'tsp': False,
+                'recomputation': False,
+                'batch_size': 64,
+                'verbose': 0
+            }
+            start_time_gibb_sampl = time.time()
+            X_my = gibb_sampl(info_dic)
+            end_time_gibb_sampl = time.time()
+            print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
+        #   print(X_my)
+            total_time_gibb_sampl[j, i] = end_time_gibb_sampl - start_time_gibb_sampl
+            print("\nend my gibb sampling\n")
+
+            print("It imputer Ridge Reg")
+            ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
+            start4 = time.time()   # tic
+            res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
+        #   print("result IterativeImptuer with Ridge\n", res4)
+            end4 = time.time()     # toc
+            total_time_ridge[j, i] = end4 - start4
+            np.testing.assert_allclose(X_my, res4)
+            print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
+            
+            #if not info_dic['tsp']:
+            #    np.testing.assert_allclose(X_my, res4)
+            #np.testing.assert_allclose(X_my, res4)
+            print("test gibb sampl ended successfully")    
+    print("total time gibb sampl\n", total_time_gibb_sampl)
+    print("total time ridge\n", total_time_ridge)
+    clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
+    for i, d_i in enumerate(list_d):
+        plt.plot(list_n, total_time_gibb_sampl[:, i], label="my_gibb, dim: " + str(d_i), marker="o", color=clr[i])
+        plt.plot(list_n, total_time_ridge[:, i], label="ridge  , dim: " + str(d_i), marker="*", color=clr[i])
+        #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
+        plt.xlabel("train size")
+        plt.ylabel("time")
+    plt.title("Time in function of training size")
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    #plt.text(5.05, 0.5, "ciao sono un testo", rotation=0)
+    plt.figtext(0.71, 0.65, "Extra info about curves", fontsize=10)
+    plt.tight_layout() 
+    #plt.legend()
+    plt.show()
+
+
+
+plot_some_graph()
+
 
 
 '''
