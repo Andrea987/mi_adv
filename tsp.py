@@ -11,6 +11,7 @@ from imputations_method import multiple_imputation
 from scipy.linalg import cho_factor, cho_solve
 #from itertools import batched
 import matplotlib.pyplot as plt
+from scipy.sparse import csr_matrix
 
 from utils import flip_matrix, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
 
@@ -490,6 +491,8 @@ def gibb_sampl(info):
     return X
 '''
 
+
+
 def gibb_sampl(info):
     # flip matrix
     X = info['data']
@@ -514,7 +517,32 @@ def gibb_sampl(info):
         b_s = 1
     #print("who is X in gibb sampl \n", X)
     ones = np.ones((d, d)) 
-    F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #start_algo_gibb_s_partial = time.time()
+    s = np.ones_like(M.T)
+    ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix masks: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    start_algo_gibb_s_partial = time.time()
+    s = np.ones_like(M.T)
+    ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    end_algo_gibb_s_partial = time.time()
+    print(f"Elapsed time gibb sampl, cov matrix, M: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    start_algo_gibb_s_partial_sparse = time.time()
+    M_s = csr_matrix(M)
+    ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+    print("type flip matrix ", type(F))
+    #np.testing.assert_allclose(F, FF)
+    end_algo_gibb_s_partial_sparse = time.time()
+    print(f"Elapsed time gibb sampl, cov matrix, M sparse: {end_algo_gibb_s_partial_sparse - start_algo_gibb_s_partial_sparse:.4f} seconds\n\n")
+    
     #print("flip matrix\n", F)
     if info['tsp']:
         start_time = time.time()
@@ -533,10 +561,9 @@ def gibb_sampl(info):
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
+    start_gibb_s = time.time()
     Rt_R = R.T @ R + lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
-    start_gibb_s = time.time()
-
     for h in range(r):
         for i in range(d):
             #print("index ", i)
@@ -568,10 +595,20 @@ def gibb_sampl(info):
                     Rt_R = R.T @ R + lbd * np.eye(d)
                     Q = np.linalg.inv(Rt_R)
                 '''
-                Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
-                #print("nupd + nded ", nupd + ndwd)
+                idx = i+1 if i<d-1 else 0
+                #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
+                if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
+                    #print("recompute the matrix with the missing components")
+                    R = X[M[:, idx] == 0, :]
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                else: 
+                    Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #RR = X[M[:, idx] == 0, :]
+                    #Rt_RR = RR.T @ RR + lbd * np.eye(d)
+                    #np.testing.assert_allclose(Rt_R, Rt_RR)
                 if nupd + ndwd > d:
-                    idx = i+1 if i<d-1 else 0
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    #idx = i+1 if i<d-1 else 0
                     #print(idx)
                     #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
                     #print("first set vct ", R)
@@ -579,6 +616,7 @@ def gibb_sampl(info):
                     #Rt_R = R.T @ R + lbd * np.eye(d)
                     Q = np.linalg.inv(Rt_R)
                 else:
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     Q = swm_formula(Q, X_upd.T, 1.0)
                     Q = swm_formula(Q, X_dwd.T, -1.0)
                     #print("QQ\n ", QQ)
@@ -657,8 +695,8 @@ def plot_some_graph():
 #    list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [500, 1000, 1500, 2000]
-    list_d = [50, 100, 150, 200]
+    list_n = [8000]  # increasing order
+    list_d = [400]  # increasing order
     lbd = 1 + 0.0
     n, d = list_n[-1], list_d[-1]
     print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
@@ -678,8 +716,11 @@ def plot_some_graph():
     #M = np.random.binomial(1, 0.01, size=(n, d))
     exponent = (n ** (3/4)) / n
     print("exponent", exponent)
-    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
-    #M = np.random.binomial(n=1, p=0.5, size= (n, d))
+    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
+    p1 = 1/2 - np.sqrt(1 - 2 * d/n) if 2 * d/n>0 else d/(2 * n)
+    p1 = 0.25
+    print("p1:   ", p1)
+    M = np.random.binomial(n=1, p=p1, size= (n, d))
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
@@ -692,9 +733,13 @@ def plot_some_graph():
             print("\n\n current size ", n_j)
             ones = np.ones((d_i, d_i))
             MM = M[0:n_j, 0:d_i]
-            F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
+            #F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
+            print("2 * n * p1 * (1-p1):   ", 2 * n_j * p1 * (1-p1))
             #FF = flip_matrix(M.T)
-            print("flip matrix in make mask with bounded flip\n", F[0:4, 0:4])
+            #ones_d = np.ones(d_i)
+            #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+            #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+            #print("flip matrix in make mask with bounded flip\n", F[0:8, 0:8])
             info_dic = {
                 'data': X[0:n_j, 0:d_i],
                 'masks': M[0:n_j, 0:d_i],
@@ -714,8 +759,8 @@ def plot_some_graph():
             print("\nend my gibb sampling\n")
 
             print("It imputer Ridge Reg")
-            ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
             start4 = time.time()   # tic
+            ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
             res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
         #   print("result IterativeImptuer with Ridge\n", res4)
             end4 = time.time()     # toc
