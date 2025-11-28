@@ -608,12 +608,14 @@ def gibb_sampl(info):
                     #print("recompute the matrix with the missing components")
                     R = X[M[:, idx] == 0, :]
                     Rt_R = R.T @ R + lbd * np.eye(d)
-                else: 
+                else:
+                    #print("update the covariance matrix") 
                     Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
                     #RR = X[M[:, idx] == 0, :]
                     #Rt_RR = RR.T @ RR + lbd * np.eye(d)
                     #np.testing.assert_allclose(Rt_R, Rt_RR)
                 if nupd + ndwd > d:
+                    #print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
                     #print(idx)
@@ -623,6 +625,7 @@ def gibb_sampl(info):
                     #Rt_R = R.T @ R + lbd * np.eye(d)
                     Q = np.linalg.inv(Rt_R)
                 else:
+                    #print("low rank upd")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     Q = swm_formula(Q, X_upd.T, 1.0)
                     Q = swm_formula(Q, X_dwd.T, -1.0)
@@ -702,8 +705,8 @@ def plot_some_graph():
 #    list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [2000, 4000, 8000, 16000, 32000]  # increasing order
-    list_d = [200]  # increasing order
+    list_n = [1000, 2000, 4000, 6000]  # increasing order
+    list_d = [400]  # increasing order
     lbd = 1 + 0.0
     n, d = list_n[-1], list_d[-1]
     print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
@@ -725,7 +728,7 @@ def plot_some_graph():
     print("exponent", exponent)
     p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
     #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.1, p_flip=p1)
-    p1 = 0.25
+    p1 = 0.4
     #print("p1:   ", p1)
     M = np.random.binomial(n=1, p=p1, size= (n, d))
     X_nan = X.copy()
@@ -770,15 +773,19 @@ def plot_some_graph():
             print("\nend my gibb sampling\n")
 
             print("It imputer Ridge Reg")
-            start4 = time.time()   # tic
+            start44 = time.time()   # tic
             ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
+            end44 = time.time()   # tic
+            print(f"Elapsed time no 4 iterative imputer definition: {end44 - start44:.4f} seconds\n\n")
+
+            start4 = time.time()
             res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
         #   print("result IterativeImptuer with Ridge\n", res4)
             end4 = time.time()     # toc
-            total_time_ridge[j, i] = end4 - start4
-            np.testing.assert_allclose(X_my, res4)
+            total_time_ridge[j, i] = end4 - start4 
             print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-            
+            np.testing.assert_allclose(X_my, res4)
+
             start_baseline = time.time()   # tic
             #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
             X_my_baseline = gibb_sampl_no_modification(info_dic)  
