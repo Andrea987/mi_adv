@@ -58,10 +58,12 @@ def generate_masks(dictio_data):#nbr_of_sample, dim, p_missing):
     # nbr_of_sample is the number of masks
     # p_missing=[p00, p01, p10], where p00 is the probability of seeing both components,
     # p10 is the probability of seeing the right component, p01 is the probability of seeing the left component
+    print("gt/n ", dictio_data['beta_gt'][0])
     dim = len(dictio_data['beta_gt'][0])
     nbr_of_sample = dictio_data['n_train'][-1]  # last one should be the biggest one
     p_missing = dictio_data['p_miss'][0]
     print("p_missing in generate mask ", p_missing)
+    print("cumprod ", np.cumprod(p_missing))
     if dim == 2:
       if len(p_missing) < 3:
         print("WARNING: p_missing should be a list with a length of 3 if the dimension is 2")
@@ -73,6 +75,7 @@ def generate_masks(dictio_data):#nbr_of_sample, dim, p_missing):
     else:
       # in this branch, p_missing = [p1,.., pl],
       masks = np.array([np.random.binomial(1, 1-pr, (nbr_of_sample, dim)) for pr in p_missing])
+      #print("masks\n ", masks)
       masks = np.cumsum(masks, axis=0)  # each round
       masks[masks>1] = 1
     return masks

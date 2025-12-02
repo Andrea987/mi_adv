@@ -265,7 +265,7 @@ def gibb_sampl_no_modification(info):
     M = info['masks']
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
     X = imp_mean.fit_transform(X_nan)
     #print("simple imputer in gibb sample \n", X)
     #print("shape M", M.shape)
@@ -498,6 +498,93 @@ def gibb_sampl(info):
 '''
 
 
+def impute_matrix_overparametrized(X, M, K_inv, idx):
+    n_m = np.sum(M[:, idx])  #  nbr missing, M_ij = 1 iff component is missing
+    X.copy()
+    C = K_inv[M[:, idx] == 1, :]  #  (n_m, n)
+    S_C = C[0:n_m, 0:n_m]  #  Schur Complement
+    A = C[0:n_m, n_m::] 
+    X_s = X[M[:, idx] == 0, :]
+    x = np.linalg.solve(S_C, A @ X_s)
+    X[M[:, idx] == 1, idx] = x
+    
+    return X
+
+
+
+def gibb_sampl_over_parametrized(X, M, lbd, nbr_it_gs):
+    ## Gibb sampling in an overparametrized setting
+    n, d = X.shape  # suppose n < d
+    X_del = np.delete(X, 0, axis=1)
+    K = X_del @ X_del.T + lbd * np.eye(n)  # (n, n)
+    K_inv = np.linalg.inv(K)
+    for h in range(nbr_it_gs):
+        for i in range(d):
+            #print("index ", i)
+            X = impute_matrix_overparametrized(X, M, K_inv, i)
+            if h < nbr_it_gs-1 or i < d-1:
+                v_to_add = X[:, i]
+                if i == d-1:
+                    v_to_remove = X[:, ]
+                #N = Ms[:, i]
+                #X_upd, X_dwd = split_upd(X, N)
+                #print(N)
+                #print("sequence of print")
+                #if info['verbose'] > 0:
+                print(X)
+                #print(X_upd)
+                #print(X_dwd)
+                nupd, _ = X_upd.shape
+                ndwd, _ = X_dwd.shape
+                '''
+                if nupd + ndwd > n:
+                    idx = i+1 if i<d-1 else 0
+                    print(idx)
+                    R = X[M[:, idx] == 0, :]
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                '''
+                idx = i+1 if i<d-1 else 0
+                #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
+                if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
+                    #print("recompute the matrix with the missing components")
+                    
+                    R = X[M[:, idx] == 0, :]
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                else:
+                    #print("update the covariance matrix") 
+                    Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #RR = X[M[:, idx] == 0, :]
+                    #Rt_RR = RR.T @ RR + lbd * np.eye(d)
+                    #np.testing.assert_allclose(Rt_R, Rt_RR)
+                if nupd + ndwd > d ** (3/4):
+                    #print("invert the matrix")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    #idx = i+1 if i<d-1 else 0
+                    #print(idx)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    #Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                else:
+                    #print("low rank upd")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    Q = swm_formula(Q, X_upd.T, 1.0)
+                    Q = swm_formula(Q, X_dwd.T, -1.0)
+                    #for i_up in range(nupd):
+                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+                    #for i_dw in range(ndwd):
+                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
+                    #print("QQ\n ", QQ)
+                    #print("Q\n", Q)
+                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+
+
 
 def gibb_sampl(info):
     # flip matrix
@@ -505,7 +592,7 @@ def gibb_sampl(info):
     M = info['masks']
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
     X = imp_mean.fit_transform(X_nan)
     #print("simple imputer in gibb sample \n", X)
     #print("shape M", M.shape)
@@ -606,15 +693,19 @@ def gibb_sampl(info):
                 #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
                 if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
                     #print("recompute the matrix with the missing components")
+                    
                     R = X[M[:, idx] == 0, :]
                     Rt_R = R.T @ R + lbd * np.eye(d)
+
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+
                 else:
                     #print("update the covariance matrix") 
                     Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
                     #RR = X[M[:, idx] == 0, :]
                     #Rt_RR = RR.T @ RR + lbd * np.eye(d)
                     #np.testing.assert_allclose(Rt_R, Rt_RR)
-                if nupd + ndwd > d:
+                if nupd + ndwd > d ** (3/4):
                     #print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
@@ -629,6 +720,10 @@ def gibb_sampl(info):
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     Q = swm_formula(Q, X_upd.T, 1.0)
                     Q = swm_formula(Q, X_dwd.T, -1.0)
+                    #for i_up in range(nupd):
+                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+                    #for i_dw in range(ndwd):
+                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
                     #print("QQ\n ", QQ)
                     #print("Q\n", Q)
                     #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
@@ -701,8 +796,8 @@ test_gibb_sampl_no_modification()
 
 def plot_some_graph():
     print("\n\nstarting plot some graph()\n")
-#    list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
-#    list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
+    #list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
+    #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
     list_n = [1000, 2000, 4000, 6000]  # increasing order
@@ -731,11 +826,15 @@ def plot_some_graph():
     p1 = 0.4
     #print("p1:   ", p1)
     M = np.random.binomial(n=1, p=p1, size= (n, d))
+    #p_missing = [0.8 , 0.6, 0.3]
+    #M = np.array([np.random.binomial(1, 1-pr, (nbr_of_sample, dim)) for pr in p_missing])
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     R = 2
     tsp_switch = False
+    df = pd.DataFrame(columns=['n_train', 'dim', 'p_miss'])
+    print(df)
     total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
     total_time_ridge = np.zeros_like(total_time_gibb_sampl)
     total_time_baseline = np.zeros_like(total_time_gibb_sampl)
@@ -780,7 +879,7 @@ def plot_some_graph():
 
             start4 = time.time()
             res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
-        #   print("result IterativeImptuer with Ridge\n", res4)
+            #print("result IterativeImptuer with Ridge\n", res4)
             end4 = time.time()     # toc
             total_time_ridge[j, i] = end4 - start4 
             print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
@@ -789,7 +888,7 @@ def plot_some_graph():
             start_baseline = time.time()   # tic
             #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
             X_my_baseline = gibb_sampl_no_modification(info_dic)  
-        # print("result IterativeImptuer with Ridge\n", res4)
+            # print("result IterativeImptuer with Ridge\n", res4)
             end_baseline = time.time()     # toc
             total_time_baseline[j, i] = end_baseline - start_baseline
             print(f"Elapsed time no 4 iterative imputer baseline prec: {end_baseline - start_baseline:.4f} seconds\n\n")
@@ -821,8 +920,176 @@ def plot_some_graph():
     plt.show()
 
 
+def plot_some_graph_2():
+    print("\n\nstarting plot some graph 2(). In this function we go through the probabilities\n")
+    #list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
+    #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
+    #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
+    #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    list_n = [600]  # increasing order
+    list_d = [400]  # increasing order
+    list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.29, 0.28, 0.27, 0.26, 0.25, 0.20, 0.15, 0.1, 0.05, 0.025, 0.01]
+    #list_p_seen_true = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    list_p_seen = list_p_seen_true[:-1]
+    list_p_seen.insert(0, 1.0)
+    print("list p seen true ", list_p_seen_true)
+    print("list prob        ", list_p_seen)
+    list_p_seen = [list_p_seen_true[i] / list_p_seen[i] for i in range(len(list_p_seen))]
+    print("list p _seen ", list_p_seen)
+    print("true probabilities, cumprod ", np.cumprod(list_p_seen)) 
+    lbd = 1 + 0.0
+    n, d = list_n[-1], list_d[-1]
+    #print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
+    #print("n ** (3/4)", n ** (3/4))
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    print("max min ")
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    # Standardize
+    X = (X_orig - mean) / std
+    X = X_orig
+    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    print(np.max(X))
+    print(np.min(X))
+    #M = np.random.binomial(1, 0.01, size=(n, d))
+    #p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
+    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.1, p_flip=p1)
+    #p1 = 0.4
+    #print("p1:   ", p1)
+    #M = np.random.binomial(n=1, p=p1, size= (n, d))
+    #M = np.array([np.random.binomial(1, 1-pr, (nbr_of_sample, dim)) for pr in p_missing])
+    
+    #X_nan = X.copy()
+    #X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 2
+    tsp_switch = False
+    df = pd.DataFrame(columns=['n_train', 'dim', 'p_seen', 'time_my', 'time_skl', 'time_bsl'])
+    print(df)
+    total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
+    total_time_ridge = np.zeros_like(total_time_gibb_sampl)
+    total_time_baseline = np.zeros_like(total_time_gibb_sampl)
+    for i, d_i in enumerate(list_d):
+        print("\ncurrent dimension ", d_i)
+        for j, n_j in enumerate(list_n):
+            for s in list_p_seen:
+                print(s)
+            masks = np.array([np.random.binomial(1, 1-pr, (n_j, d_i)) for pr in list_p_seen])
+            masks = np.cumsum(masks, axis=0)  # each round
+            masks[masks>1] = 1
+            for k, p_k in enumerate(list_p_seen_true):
+                print("\n\n current size ", n_j)
+                M = masks[k, :, :]
+                for ii in range(d_i):
+                    nbr = np.random.randint(0, n_j)
+                    #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
+                    if np.sum(M[:, ii]) == n_j:
+                        print("add a random seen component")
+                        M[nbr, ii] = 0
+                X_nan = X.copy()
+                X_nan[M==1] = np.nan
+                print("X_nan \n", X_nan)
+                ones = np.ones((d_i, d_i))
+                MM = M[0:n_j, 0:d_i]
+                #F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
+                print("nbr seen components ", n_j - np.sum(MM, axis=0))
+                print("nbr missing components ", np.sum(MM, axis=0))
+                print("2 * n * p1 * (1-p1):   ", 2 * n_j * p_k * (1-p_k))
+                
+                #FF = flip_matrix(M.T)
+                #ones_d = np.ones(d_i)
+                #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+                #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+                #print("flip matrix in make mask with bounded flip\n", F[0:8, 0:8])
+                info_dic = {
+                    'data': X[0:n_j, 0:d_i],
+                    'masks': M,  #M[k, :, :],
+                    'nbr_it_gibb_sampl': R,
+                    'lbd_reg': lbd,
+                    'tsp': tsp_switch,
+                    'recomputation': False,
+                    'batch_size': 64,
+                    'verbose': 0
+                }
+                start_time_gibb_sampl = time.time()
+                X_my = gibb_sampl(info_dic)
+                end_time_gibb_sampl = time.time()
+                print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
+            #   print(X_my)
+                t_my = end_time_gibb_sampl - start_time_gibb_sampl
+                total_time_gibb_sampl[j, i] = t_my  # end_time_gibb_sampl - start_time_gibb_sampl
+                print("\nend my gibb sampling\n")
 
-plot_some_graph()
+                print("It imputer Ridge Reg")
+                #start_skl = time.time()   # tic
+                ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='constant', verbose=0)
+                #end_skl = time.time()   # tic
+                #print(f"Elapsed time no 4 iterative imputer definition: {end_skl_ptl - start_skl_ptl:.4f} seconds\n\n")
+
+                start_skl = time.time()
+                res_skl = ice_skl.fit_transform(X_nan[0:n_j, 0:d_i])
+                #print("result IterativeImptuer with Ridge\n", res4)
+                end_skl = time.time()     # toc
+                t_skl = end_skl - start_skl
+                total_time_ridge[j, i] = end_skl - start_skl 
+                print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end_skl - start_skl:.4f} seconds\n\n")
+                #np.testing.assert_allclose(X_my, res_skl)
+
+                start_baseline = time.time()   # tic
+                #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
+                X_my_baseline = gibb_sampl_no_modification(info_dic)  
+                # print("result IterativeImptuer with Ridge\n", res4)
+                end_baseline = time.time()     # toc
+                t_bsl = end_baseline - start_baseline
+                total_time_baseline[j, i] = end_baseline - start_baseline
+
+                df.loc[len(df)] = [n_j, d_i, p_k, t_my, t_skl, t_bsl]
+
+                print(f"Elapsed time no 4 iterative imputer baseline prec: {end_baseline - start_baseline:.4f} seconds\n\n")
+                #if not info_dic['tsp']:
+                #np.testing.assert_allclose(X_my, res_skl)
+                #np.testing.assert_allclose(X_my, res4)
+                print("test gibb sampl ended successfully")   
+    
+    p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
+    p2 = 1/2 + np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
+    print("p1 ", p1, ",  p2 ", p2,  ",   d/n ", d/n)
+    print("df \n", df) 
+    print("total time gibb sampl\n", total_time_gibb_sampl)
+    print("total time ridge\n", total_time_ridge)
+    print("total time baseline\n", total_time_baseline)
+    clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
+    for i, d_i in enumerate(list_d):
+        plt.plot(list_p_seen_true, df['time_my'], label="our_gibb, dim: " + str(d_i), marker="o", color=clr[i])
+        plt.plot(list_p_seen_true, df['time_skl'], label="ridge  , dim: " + str(d_i), marker="*", color=clr[i+1])
+        plt.plot(list_p_seen_true, df['time_bsl'], label="baseline  , dim: " + str(d_i), marker="s", color=clr[i+2])
+        #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
+        plt.axvline(x = p1, linestyle='--', linewidth=1)
+        plt.axvline(x = p2, linestyle='--', linewidth=1)
+        plt.axvline(x = d/n, linestyle='--', linewidth=0.5)
+        #plt.axvline(x = (1-d/n) * (d/n), linestyle='--', linewidth=2)
+        #plt.axvline(x = 1-(1-d/n) * (d/n), linestyle='--', linewidth=2)
+        #plt.axvline(x = (1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
+        #plt.axvline(x = 1-(1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
+        plt.xlabel("prob seen")
+        plt.ylabel("time")
+    plt.title("Time in function of training size")
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    #plt.text(5.05, 0.5, "ciao sono un testo", rotation=0)
+    #text = "MCAR p_miss: " + str(p1) + "\n\n"
+    #text = "prob flip: " + str(p1) + "\n\n"
+    #text1 = "tsp: " + str(tsp_switch) + "nbr it: " + str(R)
+
+    #plt.figtext(0.71, 0.65, "Extra info about curves:\n" + text + text1, fontsize=10)
+    plt.tight_layout() 
+    #plt.legend()
+    plt.show()
+
+
+
+plot_some_graph_2()
 
 
 
