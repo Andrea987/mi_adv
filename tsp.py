@@ -507,13 +507,24 @@ def impute_matrix_overparametrized(X, M, K_inv, idx):
     X_s = X[M[:, idx] == 0, :]
     x = np.linalg.solve(S_C, A @ X_s)
     X[M[:, idx] == 1, idx] = x
-    
     return X
 
 
 
-def gibb_sampl_over_parametrized(X, M, lbd, nbr_it_gs):
+def gibb_sampl_over_parametrized(info):
     ## Gibb sampling in an overparametrized setting
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    nbr_it_gs = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
     n, d = X.shape  # suppose n < d
     X_del = np.delete(X, 0, axis=1)
     K = X_del @ X_del.T + lbd * np.eye(n)  # (n, n)
@@ -525,64 +536,10 @@ def gibb_sampl_over_parametrized(X, M, lbd, nbr_it_gs):
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
                 if i == d-1:
-                    v_to_remove = X[:, ]
-                #N = Ms[:, i]
-                #X_upd, X_dwd = split_upd(X, N)
-                #print(N)
-                #print("sequence of print")
-                #if info['verbose'] > 0:
-                print(X)
-                #print(X_upd)
-                #print(X_dwd)
-                nupd, _ = X_upd.shape
-                ndwd, _ = X_dwd.shape
-                '''
-                if nupd + ndwd > n:
-                    idx = i+1 if i<d-1 else 0
-                    print(idx)
-                    R = X[M[:, idx] == 0, :]
-                    #print("first set vct ", R)
-                    #print("first set vct shape ", R.shape)
-                    Rt_R = R.T @ R + lbd * np.eye(d)
-                    Q = np.linalg.inv(Rt_R)
-                '''
-                idx = i+1 if i<d-1 else 0
-                #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
-                if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
-                    #print("recompute the matrix with the missing components")
-                    
-                    R = X[M[:, idx] == 0, :]
-                    Rt_R = R.T @ R + lbd * np.eye(d)
-
-                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
-                else:
-                    #print("update the covariance matrix") 
-                    Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
-                    #RR = X[M[:, idx] == 0, :]
-                    #Rt_RR = RR.T @ RR + lbd * np.eye(d)
-                    #np.testing.assert_allclose(Rt_R, Rt_RR)
-                if nupd + ndwd > d ** (3/4):
-                    #print("invert the matrix")
-                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
-                    #idx = i+1 if i<d-1 else 0
-                    #print(idx)
-                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
-                    #print("first set vct ", R)
-                    #print("first set vct shape ", R.shape)
-                    #Rt_R = R.T @ R + lbd * np.eye(d)
-                    Q = np.linalg.inv(Rt_R)
-                else:
-                    #print("low rank upd")
-                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
-                    Q = swm_formula(Q, X_upd.T, 1.0)
-                    Q = swm_formula(Q, X_dwd.T, -1.0)
-                    #for i_up in range(nupd):
-                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
-                    #for i_dw in range(ndwd):
-                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
-                    #print("QQ\n ", QQ)
-                    #print("Q\n", Q)
-                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+                    v_to_remove = X[:, 0]
+                K_inv = swm_formula(K_inv, v_to_add, 1.0)
+                K_inv = swm_formula(K_inv, v_to_remove, -1.0)
+    return X
 
 
 
