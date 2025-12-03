@@ -127,7 +127,6 @@ def rk_1_update_inverse(Q, u, c):
     return Q - np.outer(w, w) / (1/c + np.sum(u * w))
 
 
-
 def matrix_switches(M):
     # this matrix encode which vectors should move
     # from one side to the other
@@ -140,8 +139,6 @@ def matrix_switches(M):
     return M - M1
 
 
-
-
 def inverse_2_times_2_sym(A):
     # A is a 2x2 symmetric matrix, compute the inverse
     C = np.zeros_like(A)
@@ -152,6 +149,7 @@ def inverse_2_times_2_sym(A):
     detr = A[0, 0] * A[1, 1] - (A[0, 1]**2)
     #print(C)
     return C / detr
+
 
 def update_inverse_rk2_sym(A_inv, W):
     # A_inv is the dxd symmetric inverse of the object matrix A
@@ -175,6 +173,8 @@ def update_inverse_rk2_sym(A_inv, W):
     res = A_inv - WTA_inv.T @ N_inv @ WTA_inv
     #print("res inside update 2 inv\n", res)
     return (res + res.T) / 2
+
+
 
 
 

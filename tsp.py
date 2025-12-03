@@ -78,24 +78,6 @@ def split_upd(X, ms):
     #return {'+': X_upd, '-': X_dwd}
 
 
-def test_split_upd():
-    n, d = 9, 3
-    X = np.random.randint(1, 5, size =(n, d))  + 0.0
-    m = np.random.binomial(n=1, p=0.3, size= (n, d))
-    #m1 = np.random.binomial(n=1, p=0.3, size=n)
-    #m2 = np.random.binomial(n=1, p=0.3, size=n)
-    #print(m1)
-    #print(m2)
-    #m = np.array([m1, m2])
-    #print("masks\n\n ", m)
-    #print("masks\n ", m)
-    ms = matrix_switches(m)
-    #print("ms \n ", ms)
-    vpl, vmn = split_upd(X, ms[:, 0])
-    #print("X\n ", X)
-    #print("updates/downdates, \n", ms)
-    #print("v pl \n", vpl)
-    #print("v mn \n", vmn)
 
 def impute_matrix(XX, Q, M, i):
     # X input matrix
@@ -138,8 +120,6 @@ def impute_matrix(XX, Q, M, i):
     #X[:, i] = np.zeros_like(X[:, i])
     #print("new X\n", X)
     return X, v  # imputed matrix, coeff
-
-
 
 
 def swm_formula(Q, U, c):
@@ -188,25 +168,7 @@ def swm_formula(Q, U, c):
         #print("w", w)
         ret = Q - w.T @ sol # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
     return ret
-
-
-def test_swm():
-    n, d, m, c = 6, 3, 2, 0.2
-    X = np.random.randint(1, 5, size = (n, d))  + 0.0
-    U = np.random.randint(1, 5, size = (m, d))  + 0.0
-    A = X.T @ X  + np.eye(d)  # (d, d)
-    Q = np.linalg.inv(A)
-    A_upd = A + c * U.T @ U
-    print(X)
-    print(U)
-    Q_upd_inv = np.linalg.inv(A_upd)
-    Q_tested = swm_formula(Q, U.T, c)
-    print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
-    #print(Q_tested @ A_upd)
-    np.testing.assert_allclose(Q_upd_inv, Q_tested)
-
-#test_swm()
-print("end test swm successfully")
+    
 
 def rk_1_update_inverse(Q, u, c):
     #print(Q)
@@ -219,44 +181,6 @@ def rk_1_update_inverse(Q, u, c):
     #print(u)
     #print(w)
     return Q - np.outer(w, w) / (1/c + np.sum(u * w))
-
-    
-def test_rk_1_update_inverse():
-    n, d, c = 5, 3, -0.345
-    X = np.random.randint(1, 5, size =(n, d))  + 0.0
-    u = np.random.randint(1, 5, size = d)  + 0.0
-    A = X.T @ X  + np.eye(d)  # (d, d)
-    Q = np.linalg.inv(A)
-    A_upd = A + c * np.outer(u, u)
-    Q_upd_inv = np.linalg.inv(A_upd)
-    Q_tested = rk_1_update_inverse(Q, u, c)
-    print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
-    #print(Q_tested @ A_upd)
-    np.testing.assert_allclose(Q_upd_inv, Q_tested)
-
-
-def test_impute_matrix():
-    print("beginning test impute matrix ")
-    n, d = 30, 5
-    X = np.random.randint(1, 5, size=(n, d))
-    M = np.random.binomial(1, 0.2, size=(n, d))
-    #print("masks in test impute matrix\n", M)
-    for i in range(d):
-        xi = X[:, i]
-        X_i = np.delete(X, i, axis=1)
-        alpha = 0.3213
-        #Q = np.linalg.inv(X_i.T @ X_i + alpha * np.eye(d-1))
-        Q = np.linalg.inv(X.T @ X + alpha * np.eye(d))
-        clf = Ridge(alpha=alpha, fit_intercept=False)
-        clf.fit(X_i, xi)
-        X, my_coeff = impute_matrix(X, Q, M, i)
-        #print("my coeff from Ridge  ", my_coeff)
-        #print("coeff from Ridge fit ", clf.coef_)
-        np.testing.assert_allclose(my_coeff, clf.coef_)
-    #print("masks in test impute matrix\n", M)
-    print("test impute matrix ended successfully")
-
-test_impute_matrix()
 
 
 def gibb_sampl_no_modification(info):
@@ -339,50 +263,6 @@ def gibb_sampl_no_modification(info):
     #print("res my imp \n", X)
     #print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     #return X
-
-
-def test_gibb_sampl_no_modification():
-    print("\n\nbeginning test gibb samp no modification\n")
-    n = 7
-    print("sqrt n ", np.sqrt(n))
-    print("n ** (3/4)", n ** (3/4))
-    print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 3
-    lbd = 1 + 0.0
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    #X_orig = np.random.rand(n, d) + 0.0
-    print(X_orig.dtype)
-    print("max min ")
-    mean = np.mean(X_orig, axis=0)
-    std = np.std(X_orig, axis=0)
-    # Standardize
-    #X = (X_orig - mean) / std
-    X = X_orig
-    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
-    #M = np.random.binomial(1, 0.01, size=(n, d))
-    exponent = (n ** (3/4)) / n
-    print("exponent", exponent)
-    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
-    print("masks in test gibb sampl no modification\n", M)
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    R = 2
-    info_dic = {
-        'data': X,
-        'masks': M,
-        'nbr_it_gibb_sampl': R,
-        'lbd_reg': lbd,
-        'tsp': False,
-        'recomputation': False,
-        'batch_size': 64,
-        'verbose': 0
-    }
-    res = gibb_sampl_no_modification(info_dic)
-    print("test gibb sampl no modif ended successfully")
-
 
 
 '''
@@ -498,17 +378,76 @@ def gibb_sampl(info):
 '''
 
 
-def impute_matrix_overparametrized(X, M, K_inv, idx):
+def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     n_m = np.sum(M[:, idx])  #  nbr missing, M_ij = 1 iff component is missing
-    X.copy()
-    C = K_inv[M[:, idx] == 1, :]  #  (n_m, n)
-    S_C = C[0:n_m, 0:n_m]  #  Schur Complement
-    A = C[0:n_m, n_m::] 
-    X_s = X[M[:, idx] == 0, :]
-    x = np.linalg.solve(S_C, A @ X_s)
-    X[M[:, idx] == 1, idx] = x
-    return X
+    n_s = np.sum(1-M[:, idx])
+    _, d = X.shape
 
+    X_idx = X[:, idx]
+    X_s = X_idx[M[:, idx] == 0]
+    A = K_inv[M[:, idx] == 1][:, M[:, idx] == 0]
+    if A.ndim == 1:
+        A = np.array([A])
+    if n_m < n_s:  # not many missing components 
+        print("n_m < n_s")
+        #print("M \n", M)
+        #X_del = np.delete(X, idx, axis=1)
+        
+        #X.copy()
+        #C = K_inv[M[:, idx] == 1, :]  #  (n_m, n)
+        #print("C \n", C)
+        #S_C = C[0:n_m, 0:n_m]  #  Schur Complement
+        #print(K_inv)
+        S_C = K_inv[M[:, idx] == 1, :][:, M[:, idx] == 1]
+        if S_C.ndim == 1:
+            S_C = np.array([S_C])
+        #print("S_C \n", S_C)
+        #print("A\n", A)
+        
+        #print("X_s ", X_s)
+        x = np.linalg.solve(S_C, A @ X_s)
+        #print("x\n ", x)
+        #print("check ", np.sqrt( np.sum( (S_C @ x - A@X_s)**2) ) )
+        #print("M \n ", M[:, idx])
+        #X[M[:, idx] == 1, idx] = -x
+    else:  # many missing components, it's better to work with the the submatrix of seen components
+        print("n_s < n_m")
+        K_S = K[M[:, idx] == 0, :][:, M[:, idx] == 0]  # submatrix of seen components
+        print("K_S\n", K_S)
+        v = A @ X_s
+        X_del = np.delete(X, idx, axis=1)
+        Xm = X_del[M[:, idx] == 1, :]
+        Xs = X_del[M[:, idx] == 0, :]
+        print("Xs @ Xs.T + lbd * Id\n", Xs @ Xs.T + lbd * np.eye(n_s))
+        w = Xm.T @ v
+        partial = w - Xs.T @ np.linalg.solve(K_S + lbd * np.eye(n_s), Xs @ w )
+        x = Xm @ partial + lbd * v
+        print("x\n ", x)
+        S_CC = Xm @ Xm.T - Xm @ Xs.T @ np.linalg.inv(K_S + lbd * np.eye(n_s)) @ Xs @ Xm.T + lbd * np.eye(n_m)
+        S_C_inv = np.linalg.inv(S_CC)
+        S_C_true = K_inv[M[:, idx] == 1, :][:, M[:, idx] == 1]
+        print("SC_inv\n", S_C_inv)
+        print("SC true\n ", S_C_true)
+        print("S_C_inv @ v\n ", S_C_inv @ v)
+    X[M[:, idx] == 1, idx] = -x
+
+    '''
+    Xm = X_del[M[:, idx] == 1, :]
+    Xs = X_del[M[:, idx] == 0, :]
+    #print("split X\n", X)
+    #print("\n", Xm)
+    #print(Xs)
+    one = Xm @ Xs.T
+    two = np.linalg.inv((Xs @ Xs.T + lbd * np.eye(n_s)))
+    res = -one @ two @ X_s
+    #print("check result1 in impute matrix overparamettrized\n", res)
+
+    one1 = Xm
+    two1 = np.linalg.inv((Xs.T @ Xs + lbd * np.eye(d-1)))
+    res1 = -one1 @ two1 @ (Xs.T @ X_s)
+    #print("check result1 in impute matrix overparamettrized\n", res1)
+    '''
+    return X
 
 
 def gibb_sampl_over_parametrized(info):
@@ -517,9 +456,9 @@ def gibb_sampl_over_parametrized(info):
     M = info['masks']
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
-    #print("simple imputer in gibb sample \n", X)
+    print("simple imputer in gibb sample overparametrized \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
     #print("nbr masks ", np.sum(M, axis=0))
@@ -532,11 +471,15 @@ def gibb_sampl_over_parametrized(info):
     for h in range(nbr_it_gs):
         for i in range(d):
             #print("index ", i)
-            X = impute_matrix_overparametrized(X, M, K_inv, i)
+            #idx = i if i<d-1 else 0
+            X = impute_matrix_overparametrized(X, M, K, K_inv, lbd, i)
+            #print("round ", i, ": imputed matrix gs overp\n", X)
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
-                if i == d-1:
-                    v_to_remove = X[:, 0]
+                v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
+                K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
+                #if i == d-1:
+                #    v_to_remove = X[:, 0]
                 K_inv = swm_formula(K_inv, v_to_add, 1.0)
                 K_inv = swm_formula(K_inv, v_to_remove, -1.0)
     return X
@@ -549,9 +492,9 @@ def gibb_sampl(info):
     M = info['masks']
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
-    #print("simple imputer in gibb sample \n", X)
+    print("simple imputer in gibb sample \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
     #print("nbr masks ", np.sum(M, axis=0))
@@ -561,10 +504,6 @@ def gibb_sampl(info):
     #b_s = int(np.sqrt(d))  # batch size  
     #b_s = 10
     #b_s = 5
-    b_s = info['batch_size']
-    #print("batch size ", b_s)
-    if b_s <= 0:
-        b_s = 1
     #print("who is X in gibb sampl \n", X)
     ones = np.ones((d, d)) 
     #start_algo_gibb_s_partial = time.time()
@@ -619,7 +558,7 @@ def gibb_sampl(info):
         for i in range(d):
             #print("index ", i)
             X, _ = impute_matrix(X, Q, M, i)
-            #print("who is X \n", X)
+            #print("round ", i, "who is X gs\n", X)
             #v = X.T @ X[:, i]
             #Rt_R[i, :] = v
             #Rt_R[:, i] = v
@@ -690,65 +629,8 @@ def gibb_sampl(info):
     return X
 
 
-def test_gibb_sampl():
-    # the test consists in running IterativeImputer with Ridge Regression,
-    # and our handmade gibb sampling function
-    n = 240
-    print("sqrt n ", np.sqrt(n))
-    print("n ** (3/4)", n ** (3/4))
-    print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 25
-    lbd = 1 + 0.0
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    X_orig = np.random.rand(n, d) + 0.0
-    print(X_orig.dtype)
-    print("max min ")
-    mean = np.mean(X_orig, axis=0)
-    std = np.std(X_orig, axis=0)
-    # Standardize
-    X = (X_orig - mean) / std
-    X = X_orig
-    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
-    #M = np.random.binomial(1, 0.01, size=(n, d))
-    exponent = (n ** (3/4)) / n
-    print("exponent", exponent)
-    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    R = 2
-    info_dic = {
-        'data': X,
-        'masks': M,
-        'nbr_it_gibb_sampl': R,
-        'lbd_reg': lbd,
-        'tsp': False,
-        'recomputation': False,
-        'batch_size': 64,
-        'verbose': 0
-    }
-    start_time_gibb_sampl = time.time()
-    X_my = gibb_sampl(info_dic)
-    end_time_gibb_sampl = time.time()
-    print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
-#    print(X_my) 
-    print("\nend my gibb sampling\n")
-    
-    print("It imputer Ridge Reg")
-    ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy='mean', verbose=0)
-    start4 = time.time()   # tic
-    res4 = ice4.fit_transform(X_nan)
-#    print("result IterativeImptuer with Ridge\n", res4)
-    end4 = time.time()     # toc
-    print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-    #if not info_dic['tsp']:
-    np.testing.assert_allclose(X_my, res4)
-    print("test gibb sampl ended successfully")
 
 np.random.seed(543)
-test_gibb_sampl_no_modification()
 
 
 def plot_some_graph():
@@ -1046,7 +928,7 @@ def plot_some_graph_2():
 
 
 
-plot_some_graph_2()
+#plot_some_graph_2()
 
 
 
