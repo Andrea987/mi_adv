@@ -189,9 +189,9 @@ def test_gibb_sampl():
 
 
 def test_gibb_sampl_over_parametrized():
-    n = 5
-    d = 10
-    lbd = 10 + 0.0
+    n = 100
+    d = 200
+    lbd = 1 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     #X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
@@ -204,7 +204,7 @@ def test_gibb_sampl_over_parametrized():
     #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     print(np.max(X))
     print(np.min(X))
-    M = np.random.binomial(1, 0.75, size=(n, d))
+    M = np.random.binomial(1, 0.5, size=(n, d))
     for ii in range(d):
         nbr = np.random.randint(0, n)
         #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
@@ -212,13 +212,14 @@ def test_gibb_sampl_over_parametrized():
             print("add a random seen component")
             M[nbr, ii] = 0
     exponent = (n ** (3/4)) / n
+    #M[-1, 0] = 0
     print("exponent", exponent)
     #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     print(X_nan)
-    R = 1
+    R = 2
     info_dic = {
         'data': X,
         'masks': M,
@@ -233,7 +234,7 @@ def test_gibb_sampl_over_parametrized():
     res = gibb_sampl_over_parametrized(info_dic)
     #res_std = gibb_sampl(info_dic)
     #print("final res_std\n", res_std)
-    print("final res\n", res)
+    #print("final res\n", res)
     #np.testing.assert_allclose(res, res_std)
 
     print("It imputer Ridge Reg")

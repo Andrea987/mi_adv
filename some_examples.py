@@ -42,6 +42,8 @@ print(x)
 X[m[:, idx] == 1, idx] = x
 print(X)
 
+print(x.shape)
+
 
 
 

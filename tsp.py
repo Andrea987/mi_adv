@@ -383,9 +383,14 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     n_s = np.sum(1-M[:, idx])
     _, d = X.shape
 
+    #print("K\n", K)
+    #print("K_inv\n", K_inv)
+    #print("nplinalg.inv(K)\n", np.linalg.inv(K))
+
     X_idx = X[:, idx]
-    X_s = X_idx[M[:, idx] == 0]
-    A = K_inv[M[:, idx] == 1][:, M[:, idx] == 0]
+    X_s = X_idx[M[:, idx] == 0]  # (n_m,)
+    A = K_inv[M[:, idx] == 1][:, M[:, idx] == 0]  # (n_m, n_s)
+    #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
     if A.ndim == 1:
         A = np.array([A])
     if n_m < n_s:  # not many missing components 
@@ -413,22 +418,27 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     else:  # many missing components, it's better to work with the the submatrix of seen components
         print("n_s < n_m")
         K_S = K[M[:, idx] == 0, :][:, M[:, idx] == 0]  # submatrix of seen components
-        print("K_S\n", K_S)
-        v = A @ X_s
+        #print("K_S\n", K_S)
+        v = A @ X_s  # (n_m, n_s) * (n_s,) = (n_m,) 
         X_del = np.delete(X, idx, axis=1)
-        Xm = X_del[M[:, idx] == 1, :]
-        Xs = X_del[M[:, idx] == 0, :]
-        print("Xs @ Xs.T + lbd * Id\n", Xs @ Xs.T + lbd * np.eye(n_s))
-        w = Xm.T @ v
-        partial = w - Xs.T @ np.linalg.solve(K_S + lbd * np.eye(n_s), Xs @ w )
+        Xm = X_del[M[:, idx] == 1, :]  # (n_m, d-1) 
+        Xs = X_del[M[:, idx] == 0, :]  # (n_s, d-1)
+        #print("Xs @ Xs.T + lbd * Id\n", Xs @ Xs.T + lbd * np.eye(n_s))
+        w = Xm.T @ v  # (d-1, n_m) * (n_m,) = (d-1,)
+        partial = w - Xs.T @ np.linalg.solve(K_S, Xs @ w ) 
         x = Xm @ partial + lbd * v
-        print("x\n ", x)
-        S_CC = Xm @ Xm.T - Xm @ Xs.T @ np.linalg.inv(K_S + lbd * np.eye(n_s)) @ Xs @ Xm.T + lbd * np.eye(n_m)
-        S_C_inv = np.linalg.inv(S_CC)
-        S_C_true = K_inv[M[:, idx] == 1, :][:, M[:, idx] == 1]
-        print("SC_inv\n", S_C_inv)
-        print("SC true\n ", S_C_true)
-        print("S_C_inv @ v\n ", S_C_inv @ v)
+#        print("x\n ", x)
+#        S_CC = Xm @ Xm.T - (Xm @ Xs.T) @ np.linalg.inv(K_S) @ (Xs @ Xm.T) + lbd * np.eye(n_m)
+#        S_C_inv = np.linalg.inv(S_CC)
+#        S_C_true = K_inv[M[:, idx] == 1, :][:, M[:, idx] == 1]  # this works in the other branch
+#        print("SC_inv\n", S_C_inv)
+#        print("K_inv\n", K_inv)
+#        print("\n\nSC true\n ", S_C_true)
+#        print("S_C_inv @ v\n ", S_CC @ v)
+#        S_C_true_inv = np.linalg.inv(S_C_true)
+#        print("SC true inv (from K_inv)\n", S_C_true_inv)
+#        print("SCS computed by hand\n", S_CC)
+#        x = np.linalg.inv(S_C_true) @ v
     X[M[:, idx] == 1, idx] = -x
 
     '''
@@ -472,7 +482,7 @@ def gibb_sampl_over_parametrized(info):
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
-            X = impute_matrix_overparametrized(X, M, K, K_inv, lbd, i)
+            X = impute_matrix_overparametrized(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
             #print("round ", i, ": imputed matrix gs overp\n", X)
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
