@@ -1,34 +1,59 @@
 import numpy as np
 import time
 from tsp import swm_formula, matrix_switches, split_upd, make_mask_with_bounded_flip
-from tsp import rk_1_update_inverse, impute_matrix, gibb_sampl_no_modification, gibb_sampl, gibb_sampl_over_parametrized
+from tsp import rk_1_update_inverse, impute_matrix
+from tsp import gibb_sampl_no_modification, gibb_sampl, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
+from utils import flip_matrix_manual
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
+from scipy.sparse import csr_matrix
 
 
-
+def test_flip_matrix():
+    print("test flip matrix")
+    n, d = 10, 5
+    M = np.random.binomial(1, 0.5, size=(n, d))
+    M_s = csr_matrix(M)
+    ones_d = np.ones(d)
+    FF = n * ones_d - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+    MM = flip_matrix_manual(M.T)
+    np.testing.assert_allclose(F, MM)
+    print("test flip matrix ended successfully")
+    
 
 def test_swm():
-    n, d, m, c = 6, 3, 2, 0.2
+    print("test swm started")
+    n, d, m, c = 20, 30, 5, 0.6
     X = np.random.randint(1, 5, size = (n, d))  + 0.0
     U = np.random.randint(1, 5, size = (m, d))  + 0.0
     A = X.T @ X  + np.eye(d)  # (d, d)
     Q = np.linalg.inv(A)
     A_upd = A + c * U.T @ U
-    print(X)
-    print(U)
+    #print(X)
+    #rint(U)
     Q_upd_inv = np.linalg.inv(A_upd)
     Q_tested = swm_formula(Q, U.T, c)
-    print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
+    #print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
     #print(Q_tested @ A_upd)
     np.testing.assert_allclose(Q_upd_inv, Q_tested)
+    print("test swm ended successfully\n\n")
 
 
 def test_split_upd():
-    n, d = 9, 3
-    X = np.random.randint(1, 5, size =(n, d))  + 0.0
-    m = np.random.binomial(n=1, p=0.3, size= (n, d))
+    ## the test work in the following way
+    ## start from a matrix C = sum_{i: M_i0 = 0} xi(xi.T)
+    ## then compute the update and downdate to pass to the matrix C = sum_{i: M_i1 = 0} xi(xi.T)
+    ## sum the updates and subtract the updates to C
+    ## check with the original definition of C if the results are correct
+    print("\n\ntest split upd")
+    n, d = 5, 2
+    X = np.random.randint(1, 5, size=(n, d)) + 0.0
+    M = np.random.binomial(n=1, p=0.5, size= (n, d))
+    #M = np.array( [ [1] * n, [0] * n  ]   ).T
+    #M = np.array( [ [0] * n, [1] * n  ]   ).T
+    #print(M)
     #m1 = np.random.binomial(n=1, p=0.3, size=n)
     #m2 = np.random.binomial(n=1, p=0.3, size=n)
     #print(m1)
@@ -36,17 +61,32 @@ def test_split_upd():
     #m = np.array([m1, m2])
     #print("masks\n\n ", m)
     #print("masks\n ", m)
-    ms = matrix_switches(m)
+    ms = matrix_switches(M)
     #print("ms \n ", ms)
-    vpl, vmn = split_upd(X, ms[:, 0])
+    Xs = X[M[:, 0] == 0, :]
+    C = Xs.T @ Xs #if Xs.shape[0] > 0 else np.zeros((d, d))  
+    #print(C)
+    for i in range(d):
+        vpl, vmn = split_upd(X, ms[:, i])
+        #print(C)
+        C = C + vpl.T @ vpl - vmn.T @ vmn
+        #print(C)
+        idx = i+1 if i<d-1 else 0
+        Xs = X[M[:, idx] == 0, :]
+        CC = Xs.T @ Xs
+        #print(C)
+        #print(CC)
+        np.testing.assert_allclose(C, CC)
+
     #print("X\n ", X)
     #print("updates/downdates, \n", ms)
     #print("v pl \n", vpl)
     #print("v mn \n", vmn)
-
+    print("end test split upd ended successfully\n\n")
 
 
 def test_rk_1_update_inverse():
+    print("\n\ntest rk_1 update inverse started")
     n, d, c = 5, 3, -0.345
     X = np.random.randint(1, 5, size =(n, d))  + 0.0
     u = np.random.randint(1, 5, size = d)  + 0.0
@@ -55,15 +95,14 @@ def test_rk_1_update_inverse():
     A_upd = A + c * np.outer(u, u)
     Q_upd_inv = np.linalg.inv(A_upd)
     Q_tested = rk_1_update_inverse(Q, u, c)
-    print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
+    #print("manually\n ", Q_upd_inv, "\n by function\n", Q_tested)
     #print(Q_tested @ A_upd)
     np.testing.assert_allclose(Q_upd_inv, Q_tested)
-
-
+    print("test rk_1 upd inverse ended successfully\n\n")
 
 
 def test_impute_matrix():
-    print("beginning test impute matrix ")
+    print("\n\nbeginning test impute matrix ")
     n, d = 30, 5
     X = np.random.randint(1, 5, size=(n, d))
     M = np.random.binomial(1, 0.2, size=(n, d))
@@ -81,16 +120,15 @@ def test_impute_matrix():
         #print("coeff from Ridge fit ", clf.coef_)
         np.testing.assert_allclose(my_coeff, clf.coef_)
     #print("masks in test impute matrix\n", M)
-    print("test impute matrix ended successfully")
-
+    print("test impute matrix ended successfully\n\n")
 
 
 def test_gibb_sampl_no_modification():
     print("\n\nbeginning test gibb samp no modification\n")
     n = 7
-    print("sqrt n ", np.sqrt(n))
-    print("n ** (3/4)", n ** (3/4))
-    print("n ** (3/4) / n", (n ** (3/4)) / n)
+    #print("sqrt n ", np.sqrt(n))
+    #rint("n ** (3/4)", n ** (3/4))
+    #print("n ** (3/4) / n", (n ** (3/4)) / n)
     d = 3
     lbd = 1 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
@@ -103,13 +141,13 @@ def test_gibb_sampl_no_modification():
     #X = (X_orig - mean) / std
     X = X_orig
     #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
+    #print(np.max(X))
+    #print(np.min(X))
     #M = np.random.binomial(1, 0.01, size=(n, d))
     exponent = (n ** (3/4)) / n
-    print("exponent", exponent)
+    #print("exponent", exponent)
     M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
-    print("masks in test gibb sampl no modification\n", M)
+    #print("masks in test gibb sampl no modification\n", M)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
@@ -125,12 +163,13 @@ def test_gibb_sampl_no_modification():
         'verbose': 0
     }
     res = gibb_sampl_no_modification(info_dic)
-    print("test gibb sampl no modif ended successfully")
+    print("test gibb sampl no modif ended successfully\n\n")
 
 
-def test_gibb_sampl():
+def test_gibb_sampl_under_parametrized():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
+    print("test gibb sampl under parametr started")
     n = 240
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
@@ -169,7 +208,7 @@ def test_gibb_sampl():
         'initial_strategy': 'constant'
     }
     start_time_gibb_sampl = time.time()
-    X_my = gibb_sampl(info_dic)
+    X_my = gibb_sampl_under_parametrized(info_dic)
     end_time_gibb_sampl = time.time()
     print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
 #    print(X_my) 
@@ -184,18 +223,18 @@ def test_gibb_sampl():
     print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
     #if not info_dic['tsp']:
     np.testing.assert_allclose(X_my, res4)
-    print("test gibb sampl ended successfully")
-
+    print("test gibb sampl under parametr ended successfully")
 
 
 def test_gibb_sampl_over_parametrized():
-    n = 100
-    d = 200
+    print("test gibb sample over parametr started")
+    n = 20
+    d = 30
     lbd = 1 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     #X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
-    print("max min ")
+    #print("max min ")
     mean = np.mean(X_orig, axis=0)
     std = np.std(X_orig, axis=0)
     # Standardize
@@ -213,12 +252,12 @@ def test_gibb_sampl_over_parametrized():
             M[nbr, ii] = 0
     exponent = (n ** (3/4)) / n
     #M[-1, 0] = 0
-    print("exponent", exponent)
+    #print("exponent", exponent)
     #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
-    print(X_nan)
+    #print(X_nan)
     R = 2
     info_dic = {
         'data': X,
@@ -241,10 +280,16 @@ def test_gibb_sampl_over_parametrized():
     ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     res_skl = ice_skl.fit_transform(X_nan)
     np.testing.assert_allclose(res, res_skl)
-    print("check skl vs my underparametrized passed successfully")
+    print("check skl vs my under parametrized passed successfully")
 
 
-#test_gibb_sampl()
-
+test_flip_matrix()
+test_split_upd()
+test_swm()
+test_split_upd()
+test_rk_1_update_inverse()
+test_impute_matrix()
+test_gibb_sampl_no_modification()
+test_gibb_sampl_under_parametrized()
 test_gibb_sampl_over_parametrized()
 

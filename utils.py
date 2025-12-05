@@ -44,25 +44,22 @@ def initialize(info):
     return res
 
 
-
 def nb_flip(m1, m2):
   # m1 and m2 are 0, 1 mask, 0 seen, 1 missing. 
   # Count the number of components that do not match
   return np.sum(m1 != m2)
 
-def flip_matrix(M):
+
+def flip_matrix_manual(M):
   #print("who is M, flip matrix\n", M)
   d, n = M.shape
-  print(n," ", d)
+  #print(n," ", d)
   ret = np.zeros((d, d))
   for i in range(d):
     for j in range(d):
       #print(i," ", j)
       ret[i, j] = nb_flip(M[i, :], M[j, :])
   return ret
-
-
-
 
 
 def swm_formula(Q, U, c):
@@ -111,7 +108,6 @@ def swm_formula(Q, U, c):
         #print("w", w)
         ret = Q - w.T @ sol # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
     return ret
-
 
 
 def rk_1_update_inverse(Q, u, c):

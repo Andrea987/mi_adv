@@ -13,7 +13,7 @@ from scipy.linalg import cho_factor, cho_solve
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 import pandas as pd
-from utils import flip_matrix, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
+from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
 
 
 
@@ -51,7 +51,7 @@ def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     M = np.zeros((n, d))
     #print(M)
     mask = np.random.binomial(1, p_miss, size=n)
-    print("first mask in make mask with bounded flip", mask)
+    #print("first mask in make mask with bounded flip", mask)
     for i in range(d):
         M[:, i] = mask
         flip = np.random.binomial(1, p_flip, size=n)
@@ -60,14 +60,11 @@ def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     ones = np.ones((d, d)) 
     F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
     #FF = flip_matrix(M.T)
-    print("flip matrix in make mask with bounded flip\n", F)
+    #print("flip matrix in make mask with bounded flip\n", F)
     #permutation, distance = solve_tsp_local_search(F)
     #print(permutation, distance)
     #print("test Flip matrix \n", FF)
     return M        
-
-maskkk = make_mask_with_bounded_flip(n=2, d=10, p_miss=0.3, p_flip=0.1)
-#print("masksss\n", maskkk)
 
 
 def split_upd(X, ms):
@@ -76,7 +73,6 @@ def split_upd(X, ms):
     X_dwd = X[ms == -1, :]
     return X_upd, X_dwd
     #return {'+': X_upd, '-': X_dwd}
-
 
 
 def impute_matrix(XX, Q, M, i):
@@ -468,7 +464,7 @@ def gibb_sampl_over_parametrized(info):
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
-    print("simple imputer in gibb sample overparametrized \n", X)
+    #print("simple imputer in gibb sample overparametrized \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
     #print("nbr masks ", np.sum(M, axis=0))
@@ -496,7 +492,7 @@ def gibb_sampl_over_parametrized(info):
 
 
 
-def gibb_sampl(info):
+def gibb_sampl_under_parametrized(info):
     # flip matrix
     X = info['data']
     M = info['masks']
@@ -504,7 +500,7 @@ def gibb_sampl(info):
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
-    print("simple imputer in gibb sample \n", X)
+    #print("simple imputer in gibb sample under param \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
     #print("nbr masks ", np.sum(M, axis=0))
@@ -638,6 +634,11 @@ def gibb_sampl(info):
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
 
+
+def gibb_sampl(info):
+    X = info['data']
+    n, d = X.shape
+    return gibb_sampl_under_parametrized(info) if n>=d else gibb_sampl_over_parametrized(info)
 
 
 np.random.seed(543)
