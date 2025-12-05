@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from tsp import swm_formula, matrix_switches, split_upd, make_mask_with_bounded_flip
-from tsp import rk_1_update_inverse, impute_matrix
+from tsp import rk_1_update_inverse, impute_matrix_under_parametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
 from utils import flip_matrix_manual
 from sklearn.experimental import enable_iterative_imputer
@@ -101,7 +101,7 @@ def test_rk_1_update_inverse():
     print("test rk_1 upd inverse ended successfully\n\n")
 
 
-def test_impute_matrix():
+def test_impute_matrix_under_parametrized():
     print("\n\nbeginning test impute matrix ")
     n, d = 30, 5
     X = np.random.randint(1, 5, size=(n, d))
@@ -115,7 +115,7 @@ def test_impute_matrix():
         Q = np.linalg.inv(X.T @ X + alpha * np.eye(d))
         clf = Ridge(alpha=alpha, fit_intercept=False)
         clf.fit(X_i, xi)
-        X, my_coeff = impute_matrix(X, Q, M, i)
+        X, my_coeff = impute_matrix_under_parametrized(X, Q, M, i)
         #print("my coeff from Ridge  ", my_coeff)
         #print("coeff from Ridge fit ", clf.coef_)
         np.testing.assert_allclose(my_coeff, clf.coef_)
@@ -288,7 +288,7 @@ test_split_upd()
 test_swm()
 test_split_upd()
 test_rk_1_update_inverse()
-test_impute_matrix()
+test_impute_matrix_under_parametrized()
 test_gibb_sampl_no_modification()
 test_gibb_sampl_under_parametrized()
 test_gibb_sampl_over_parametrized()

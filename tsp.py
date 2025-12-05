@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 import pandas as pd
 from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, swm_formula, rk_1_update_inverse
-
+from serialization import serialization_first_idea
 
 
 np.random.seed(53)
@@ -47,6 +47,7 @@ vp = Ms[m1 == 1, :]
 print(vp)
 '''
 
+
 def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     M = np.zeros((n, d))
     #print(M)
@@ -75,7 +76,7 @@ def split_upd(X, ms):
     #return {'+': X_upd, '-': X_dwd}
 
 
-def impute_matrix(XX, Q, M, i):
+def impute_matrix_under_parametrized(XX, Q, M, i):
     # X input matrix
     # Q current inverse, Q = (X.T@X + lbd*Id)^(-1)
     # M masks, 0 seen, 1 missing
@@ -235,7 +236,7 @@ def gibb_sampl_no_modification(info):
         for i in range(d):
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
-            X, _ = impute_matrix(X, Q, M, i)
+            X, _ = impute_matrix_under_parametrized(X, Q, M, i)
             #print("new X ", X)
             if info['verbose'] > 0:
                 print(X)
@@ -390,7 +391,7 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     if A.ndim == 1:
         A = np.array([A])
     if n_m < n_s:  # not many missing components 
-        print("n_m < n_s")
+        #print("n_m < n_s")
         #print("M \n", M)
         #X_del = np.delete(X, idx, axis=1)
         
@@ -412,7 +413,7 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
         #print("M \n ", M[:, idx])
         #X[M[:, idx] == 1, idx] = -x
     else:  # many missing components, it's better to work with the the submatrix of seen components
-        print("n_s < n_m")
+        #print("n_s < n_m")
         K_S = K[M[:, idx] == 0, :][:, M[:, idx] == 0]  # submatrix of seen components
         #print("K_S\n", K_S)
         v = A @ X_s  # (n_m, n_s) * (n_s,) = (n_m,) 
@@ -491,7 +492,6 @@ def gibb_sampl_over_parametrized(info):
     return X
 
 
-
 def gibb_sampl_under_parametrized(info):
     # flip matrix
     X = info['data']
@@ -542,8 +542,11 @@ def gibb_sampl_under_parametrized(info):
     #print("flip matrix\n", F)
     if info['tsp']:
         start_time = time.time()
-        permutation, distance = solve_tsp_local_search(F)
+        #permutation, distance = solve_tsp_local_search(F)
+        permutation, distance = serialization_first_idea(F)
         end_time = time.time()
+        original_cost = np.sum(np.diag(F, k=1))
+        print("original cost ", original_cost)
         print("optimal perm ", permutation, "optimal dist ", distance) 
         print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
         M = M[:, permutation]
@@ -563,7 +566,7 @@ def gibb_sampl_under_parametrized(info):
     for h in range(r):
         for i in range(d):
             #print("index ", i)
-            X, _ = impute_matrix(X, Q, M, i)
+            X, _ = impute_matrix_under_parametrized(X, Q, M, i)
             #print("round ", i, "who is X gs\n", X)
             #v = X.T @ X[:, i]
             #Rt_R[i, :] = v
@@ -607,7 +610,7 @@ def gibb_sampl_under_parametrized(info):
                     #RR = X[M[:, idx] == 0, :]
                     #Rt_RR = RR.T @ RR + lbd * np.eye(d)
                     #np.testing.assert_allclose(Rt_R, Rt_RR)
-                if nupd + ndwd > d ** (3/4):
+                if nupd + ndwd > d ** (1/2):
                     #print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
@@ -618,7 +621,7 @@ def gibb_sampl_under_parametrized(info):
                     #Rt_R = R.T @ R + lbd * np.eye(d)
                     Q = np.linalg.inv(Rt_R)
                 else:
-                    #print("low rank upd")
+                    #print("low rank upd of the inverse")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     Q = swm_formula(Q, X_upd.T, 1.0)
                     Q = swm_formula(Q, X_dwd.T, -1.0)
@@ -651,7 +654,7 @@ def plot_some_graph():
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
     list_n = [1000, 2000, 4000, 6000]  # increasing order
-    list_d = [400]  # increasing order
+    list_d = [100]  # increasing order
     lbd = 1 + 0.0
     n, d = list_n[-1], list_d[-1]
     print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
@@ -776,10 +779,11 @@ def plot_some_graph_2():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [600]  # increasing order
-    list_d = [400]  # increasing order
-    list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.29, 0.28, 0.27, 0.26, 0.25, 0.20, 0.15, 0.1, 0.05, 0.025, 0.01]
-    #list_p_seen_true = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    list_n = [65]  # increasing order
+    list_d = [40]  # increasing order
+    #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
+    #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
+    list_p_seen_true = [0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01]
     list_p_seen = list_p_seen_true[:-1]
     list_p_seen.insert(0, 1.0)
     print("list p seen true ", list_p_seen_true)
@@ -815,7 +819,7 @@ def plot_some_graph_2():
     #X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     R = 2
-    tsp_switch = False
+    tsp_switch = True
     df = pd.DataFrame(columns=['n_train', 'dim', 'p_seen', 'time_my', 'time_skl', 'time_bsl'])
     print(df)
     total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
@@ -861,7 +865,8 @@ def plot_some_graph_2():
                     'tsp': tsp_switch,
                     'recomputation': False,
                     'batch_size': 64,
-                    'verbose': 0
+                    'verbose': 0,
+                    'initial_strategy': 'constant'
                 }
                 start_time_gibb_sampl = time.time()
                 X_my = gibb_sampl(info_dic)
@@ -889,7 +894,9 @@ def plot_some_graph_2():
 
                 start_baseline = time.time()   # tic
                 #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
-                X_my_baseline = gibb_sampl_no_modification(info_dic)  
+                #X_my_baseline = gibb_sampl_no_modification(info_dic)
+                info_dic['tsp'] = False
+                X_my_baseline = gibb_sampl(info_dic)  
                 # print("result IterativeImptuer with Ridge\n", res4)
                 end_baseline = time.time()     # toc
                 t_bsl = end_baseline - start_baseline
@@ -919,6 +926,7 @@ def plot_some_graph_2():
         plt.axvline(x = p1, linestyle='--', linewidth=1)
         plt.axvline(x = p2, linestyle='--', linewidth=1)
         plt.axvline(x = d/n, linestyle='--', linewidth=0.5)
+        plt.axvline(x = d ** (3/4)/n, linestyle='--', linewidth=0.25)
         #plt.axvline(x = (1-d/n) * (d/n), linestyle='--', linewidth=2)
         #plt.axvline(x = 1-(1-d/n) * (d/n), linestyle='--', linewidth=2)
         #plt.axvline(x = (1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
@@ -939,7 +947,7 @@ def plot_some_graph_2():
 
 
 
-#plot_some_graph_2()
+plot_some_graph_2()
 
 
 
