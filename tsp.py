@@ -544,13 +544,28 @@ def gibb_sampl_under_parametrized(info):
         start_time = time.time()
         #permutation, distance = solve_tsp_local_search(F)
         permutation, distance = serialization_first_idea(F)
-        end_time = time.time()
+        current_distance = distance
+        current_permutation = permutation
+        
         original_cost = np.sum(np.diag(F, k=1))
         print("original cost ", original_cost)
-        print("optimal perm ", permutation, "optimal dist ", distance) 
+        #print("optimal perm ", permutation, "optimal dist ", distance) 
+        distances = []
+        distances.append(distance)
+        s = int(np.floor(np.sqrt(d)))
+        for i in range(s):
+            permutation, distance = serialization_first_idea(F)
+            distances.append(distance)
+            if distance < current_distance:
+                current_distance = distance
+                current_permutation = permutation
+        M = M[:, current_permutation]
+        X = X[:, current_permutation]
+        print("distances tsp ", np.array(distances))
+        end_time = time.time()
         print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
-        M = M[:, permutation]
-        X = X[:, permutation]
+
+    #print("exponent d ", info['exponent_d'])
     #print("\n", X)
     #print("\n", M)
     Ms = matrix_switches(M)
@@ -563,6 +578,10 @@ def gibb_sampl_under_parametrized(info):
     start_gibb_s = time.time()
     Rt_R = R.T @ R + lbd * np.eye(d)
     Q = np.linalg.inv(Rt_R)
+    counter_upd_dwd = 0
+    counter_recomputation = 0
+    counter_swm_formula = 0 
+    counter_reinversion = 0
     for h in range(r):
         for i in range(d):
             #print("index ", i)
@@ -598,19 +617,20 @@ def gibb_sampl_under_parametrized(info):
                 #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
                 if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
                     #print("recompute the matrix with the missing components")
-                    
+                    counter_recomputation = counter_recomputation + 1
                     R = X[M[:, idx] == 0, :]
                     Rt_R = R.T @ R + lbd * np.eye(d)
 
                     #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
 
                 else:
+                    counter_upd_dwd = counter_upd_dwd + 1
                     #print("update the covariance matrix") 
                     Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
                     #RR = X[M[:, idx] == 0, :]
                     #Rt_RR = RR.T @ RR + lbd * np.eye(d)
                     #np.testing.assert_allclose(Rt_R, Rt_RR)
-                if nupd + ndwd > d ** (1/2):
+                if nupd + ndwd > d ** info['exponent_d']:
                     #print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
@@ -619,8 +639,10 @@ def gibb_sampl_under_parametrized(info):
                     #print("first set vct ", R)
                     #print("first set vct shape ", R.shape)
                     #Rt_R = R.T @ R + lbd * np.eye(d)
+                    counter_reinversion = counter_reinversion + 1
                     Q = np.linalg.inv(Rt_R)
                 else:
+                    counter_swm_formula = counter_swm_formula + 1
                     #print("low rank upd of the inverse")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     Q = swm_formula(Q, X_upd.T, 1.0)
@@ -633,6 +655,10 @@ def gibb_sampl_under_parametrized(info):
                     #print("Q\n", Q)
                     #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
     end_gibb_s = time.time()
+    print("counter recomp ", counter_recomputation/r)
+    print("counter upd dwd ", counter_upd_dwd/r)
+    print("counter reinv", counter_reinversion/r)
+    print("counter swm ", counter_swm_formula/r)
     #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
@@ -779,11 +805,12 @@ def plot_some_graph_2():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [65]  # increasing order
-    list_d = [40]  # increasing order
+    list_n = [2000]  # increasing order
+    list_d = [200]  # increasing order
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
-    list_p_seen_true = [0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01]
+    #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.70, 0.65, 0.60, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01]
+    list_p_seen_true = [0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
     list_p_seen = list_p_seen_true[:-1]
     list_p_seen.insert(0, 1.0)
     print("list p seen true ", list_p_seen_true)
@@ -866,11 +893,13 @@ def plot_some_graph_2():
                     'recomputation': False,
                     'batch_size': 64,
                     'verbose': 0,
-                    'initial_strategy': 'constant'
+                    'initial_strategy': 'constant',
+                    'exponent_d': 0.9
                 }
                 start_time_gibb_sampl = time.time()
                 X_my = gibb_sampl(info_dic)
                 end_time_gibb_sampl = time.time()
+                print("current prob seen ", p_k)
                 print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
             #   print(X_my)
                 t_my = end_time_gibb_sampl - start_time_gibb_sampl
@@ -889,6 +918,7 @@ def plot_some_graph_2():
                 end_skl = time.time()     # toc
                 t_skl = end_skl - start_skl
                 total_time_ridge[j, i] = end_skl - start_skl 
+                print("current prob seen ", p_k)
                 print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end_skl - start_skl:.4f} seconds\n\n")
                 #np.testing.assert_allclose(X_my, res_skl)
 
@@ -903,15 +933,19 @@ def plot_some_graph_2():
                 total_time_baseline[j, i] = end_baseline - start_baseline
 
                 df.loc[len(df)] = [n_j, d_i, p_k, t_my, t_skl, t_bsl]
-
+                print("current prob seen ", p_k)
                 print(f"Elapsed time no 4 iterative imputer baseline prec: {end_baseline - start_baseline:.4f} seconds\n\n")
                 #if not info_dic['tsp']:
                 #np.testing.assert_allclose(X_my, res_skl)
                 #np.testing.assert_allclose(X_my, res4)
-                print("test gibb sampl ended successfully")   
-    
-    p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
-    p2 = 1/2 + np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
+                print("test baseline ended successfully")   
+    dd = d ** info_dic['exponent_d']
+    p1 = 1/2 - np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
+    p2 = 1/2 + np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
+    ## when probability = p1 or p2, then 2n(p-1)p ~ d
+    ## observe, 2n(p-1)p < np if p > (1/2), so if p greater than (1/2),
+    ## the average number of seen component is grater than the average number of flip 
+    ## if prob = d/n, the number of seen components is ~ d = n * (d/n)
     print("p1 ", p1, ",  p2 ", p2,  ",   d/n ", d/n)
     print("df \n", df) 
     print("total time gibb sampl\n", total_time_gibb_sampl)
@@ -923,10 +957,10 @@ def plot_some_graph_2():
         plt.plot(list_p_seen_true, df['time_skl'], label="ridge  , dim: " + str(d_i), marker="*", color=clr[i+1])
         plt.plot(list_p_seen_true, df['time_bsl'], label="baseline  , dim: " + str(d_i), marker="s", color=clr[i+2])
         #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
-        plt.axvline(x = p1, linestyle='--', linewidth=1)
-        plt.axvline(x = p2, linestyle='--', linewidth=1)
-        plt.axvline(x = d/n, linestyle='--', linewidth=0.5)
-        plt.axvline(x = d ** (3/4)/n, linestyle='--', linewidth=0.25)
+        plt.axvline(x = p1, linestyle='--', linewidth=2, label="sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
+        plt.axvline(x = p2, linestyle='--', linewidth=2, label="sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
+        plt.axvline(x = d/n, linestyle='--', linewidth=1, label="d/n")
+        #plt.axvline(x = d ** (3/4)/n, linestyle='--', linewidth=0.5)
         #plt.axvline(x = (1-d/n) * (d/n), linestyle='--', linewidth=2)
         #plt.axvline(x = 1-(1-d/n) * (d/n), linestyle='--', linewidth=2)
         #plt.axvline(x = (1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
@@ -941,7 +975,7 @@ def plot_some_graph_2():
     #text1 = "tsp: " + str(tsp_switch) + "nbr it: " + str(R)
 
     #plt.figtext(0.71, 0.65, "Extra info about curves:\n" + text + text1, fontsize=10)
-    plt.tight_layout() 
+    plt.tight_layout()
     #plt.legend()
     plt.show()
 
