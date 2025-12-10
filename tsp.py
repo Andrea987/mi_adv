@@ -122,6 +122,7 @@ def impute_matrix_under_parametrized(XX, Q, M, i):
 def swm_formula(Q, U, c):
     # sherman woodbury morrison formula
     # compute the inverse of (Q + c*U.T@U)ˆ(-1)
+    # Q (d, d)
     if U.ndim == 1 or U.shape[0] == 1 or U.shape[1] == 1:
         ret = rk_1_update_inverse(Q, U, c)
     else:
@@ -133,14 +134,13 @@ def swm_formula(Q, U, c):
         #print(U.dtype)
         #print("cond numb ", np.linalg.cond(Q))
         with np.errstate(over='raise'):
-            w = U.T @ Q  # x = np.exp(1000)
+            w = U.T @ Q  # (m, d) * (d, d) = (m, d), cost = O(mdˆ2)
             #cn = np.linalg.cond(Q)
             #print("cond nbr ", cn)
             #print("max Q: ", np.max(Q), ", min Q ", np.min(Q))
             #cn = 1e1
             #if cn > 1e8:
             #    print(cn)
-            
             if not np.all(np.isfinite(w)):
                 print("Q: ", Q)
                 print("cond numb:", np.linalg.cond(Q))
@@ -159,11 +159,16 @@ def swm_formula(Q, U, c):
         #print(U.shape)
         #cc, low = cho_factor(np.eye(m) / c + w @ U)
         #sol = cho_solve((cc, low), w)
-        sol = np.linalg.solve(np.eye(m) / c + w @ U, w)
+        
+        ## w @ U: (m, d) * (d, m) = (m, m):  O(mˆ2d) 
+        
+        sol = np.linalg.solve(np.eye(m) / c + w @ U, w)  #  O(mˆ3) * d times (there are d vectors in w) = O(m^3d)
         #print("sol ", sol)
         #print("trial ", (np.eye(m) / c + w @ U) @ sol)
         #print("w", w)
         ret = Q - w.T @ sol # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
+    
+        # total cost: O(mdˆ2 + mˆ2d + mˆ3d)
     return ret
     
 
@@ -385,7 +390,7 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     #print("nplinalg.inv(K)\n", np.linalg.inv(K))
 
     X_idx = X[:, idx]
-    X_s = X_idx[M[:, idx] == 0]  # (n_m,)
+    X_s = X_idx[M[:, idx] == 0]  # (n_s,)
     A = K_inv[M[:, idx] == 1][:, M[:, idx] == 0]  # (n_m, n_s)
     #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
     if A.ndim == 1:
@@ -582,6 +587,7 @@ def gibb_sampl_under_parametrized(info):
     counter_recomputation = 0
     counter_swm_formula = 0 
     counter_reinversion = 0
+    print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
         for i in range(d):
             #print("index ", i)
@@ -798,6 +804,8 @@ def plot_some_graph():
     #plt.legend()
     plt.show()
 
+## to do: run experiments with something like n=700, d=500, and study the result
+## you can see that if the percentage of missing is greater than 0.5, running tsp is actually useful
 
 def plot_some_graph_2():
     print("\n\nstarting plot some graph 2(). In this function we go through the probabilities\n")
@@ -805,12 +813,13 @@ def plot_some_graph_2():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [2000]  # increasing order
+    list_n = [4000]  # increasing order
     list_d = [200]  # increasing order
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
-    #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
+    list_p_seen_true = [0.99, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.01]
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.70, 0.65, 0.60, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01]
-    list_p_seen_true = [0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
+    #list_p_seen_true = [0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
+    #list_p_seen_true = [0.05, 0.01, 0.005]
     list_p_seen = list_p_seen_true[:-1]
     list_p_seen.insert(0, 1.0)
     print("list p seen true ", list_p_seen_true)
@@ -818,7 +827,7 @@ def plot_some_graph_2():
     list_p_seen = [list_p_seen_true[i] / list_p_seen[i] for i in range(len(list_p_seen))]
     print("list p _seen ", list_p_seen)
     print("true probabilities, cumprod ", np.cumprod(list_p_seen)) 
-    lbd = 1 + 0.0
+    lbd = 1.01 + 0.0
     n, d = list_n[-1], list_d[-1]
     #print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
     #print("n ** (3/4)", n ** (3/4))
@@ -846,7 +855,7 @@ def plot_some_graph_2():
     #X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     R = 2
-    tsp_switch = True
+    tsp_switch = False
     df = pd.DataFrame(columns=['n_train', 'dim', 'p_seen', 'time_my', 'time_skl', 'time_bsl'])
     print(df)
     total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
@@ -894,7 +903,7 @@ def plot_some_graph_2():
                     'batch_size': 64,
                     'verbose': 0,
                     'initial_strategy': 'constant',
-                    'exponent_d': 0.9
+                    'exponent_d': 0.75
                 }
                 start_time_gibb_sampl = time.time()
                 X_my = gibb_sampl(info_dic)
@@ -920,6 +929,8 @@ def plot_some_graph_2():
                 total_time_ridge[j, i] = end_skl - start_skl 
                 print("current prob seen ", p_k)
                 print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end_skl - start_skl:.4f} seconds\n\n")
+                if info_dic['tsp'] == False:
+                    np.testing.assert_allclose(X_my, res_skl)
                 #np.testing.assert_allclose(X_my, res_skl)
 
                 start_baseline = time.time()   # tic
@@ -936,9 +947,9 @@ def plot_some_graph_2():
                 print("current prob seen ", p_k)
                 print(f"Elapsed time no 4 iterative imputer baseline prec: {end_baseline - start_baseline:.4f} seconds\n\n")
                 #if not info_dic['tsp']:
-                #np.testing.assert_allclose(X_my, res_skl)
                 #np.testing.assert_allclose(X_my, res4)
-                print("test baseline ended successfully")   
+                #print("test baseline ended successfully")   
+    print("\n\n SHOW THE RESULTS")
     dd = d ** info_dic['exponent_d']
     p1 = 1/2 - np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
     p2 = 1/2 + np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
@@ -946,6 +957,7 @@ def plot_some_graph_2():
     ## observe, 2n(p-1)p < np if p > (1/2), so if p greater than (1/2),
     ## the average number of seen component is grater than the average number of flip 
     ## if prob = d/n, the number of seen components is ~ d = n * (d/n)
+    print("d ** ", info_dic['exponent_d'], ": ", dd)
     print("p1 ", p1, ",  p2 ", p2,  ",   d/n ", d/n)
     print("df \n", df) 
     print("total time gibb sampl\n", total_time_gibb_sampl)
@@ -957,9 +969,10 @@ def plot_some_graph_2():
         plt.plot(list_p_seen_true, df['time_skl'], label="ridge  , dim: " + str(d_i), marker="*", color=clr[i+1])
         plt.plot(list_p_seen_true, df['time_bsl'], label="baseline  , dim: " + str(d_i), marker="s", color=clr[i+2])
         #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
-        plt.axvline(x = p1, linestyle='--', linewidth=2, label="sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
-        plt.axvline(x = p2, linestyle='--', linewidth=2, label="sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
+        plt.axvline(x = p1, linestyle='--', linewidth=2, label="p1: sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
+        plt.axvline(x = p2, linestyle='--', linewidth=2, label="p2: sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
         plt.axvline(x = d/n, linestyle='--', linewidth=1, label="d/n")
+        plt.axvline(x = 1/2, linestyle='--', linewidth=0.5, label="1/2")
         #plt.axvline(x = d ** (3/4)/n, linestyle='--', linewidth=0.5)
         #plt.axvline(x = (1-d/n) * (d/n), linestyle='--', linewidth=2)
         #plt.axvline(x = 1-(1-d/n) * (d/n), linestyle='--', linewidth=2)
@@ -975,6 +988,14 @@ def plot_some_graph_2():
     #text1 = "tsp: " + str(tsp_switch) + "nbr it: " + str(R)
 
     #plt.figtext(0.71, 0.65, "Extra info about curves:\n" + text + text1, fontsize=10)
+    text = "Extra info about curves\n"
+    text0 = "nbr train: " + str(n) + "\n\n"
+    text1 = "right of the line d/n: nbr_seen> d\n\n"
+    text2 = "left of the line d/n : nbr_seen< d\n\n"
+    text3 = "between the lines p1,p2: nbr_flip > d ** " + str(info_dic['exponent_d']) + " = " + str(d ** info_dic['exponent_d']) + "\n\n"
+    text4 = "right line (1/2): number seen greater than number flips\n\n"
+    text5 = "left line (1/2):  number seen smaller than number flips\n\n"
+    plt.figtext(0.68, 0.5, text1 + text2 + text3 + text4, fontsize=10)
     plt.tight_layout()
     #plt.legend()
     plt.show()
