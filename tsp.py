@@ -69,6 +69,21 @@ def make_mask_with_bounded_flip(n, d, p_miss, p_flip):
     return M        
 
 
+def make_masks_mnar(n, d, perc_seen, frequency_missing):
+    #  p: probability seen
+    #  frequency_missing is the probability that one column has missing components
+    l = int(n * perc_seen)
+    M = np.zeros((n, d))
+    m = np.random.binomial(1, frequency_missing, size=d)
+    for i in range(d):
+        if m[i] == 0:
+            M[0:l, i] = 1
+    return M
+
+mm = make_masks_mnar(10, 9, 0.5, 0.5)
+print(mm)
+
+
 def split_upd(X, ms):
     # split the 1 rank perturbations in updates and downdates
     X_upd = X[ms == 1, :]
@@ -1017,8 +1032,8 @@ def plot_some_graph_2():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [10000]  # increasing order
-    list_d = [100]  # increasing order
+    list_n = [8000]  # increasing order
+    list_d = [200]  # increasing order
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
     list_p_seen_true = [0.99, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.01]
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.70, 0.65, 0.60, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01]
@@ -1066,7 +1081,7 @@ def plot_some_graph_2():
     total_time_ridge = np.zeros_like(total_time_gibb_sampl)
     total_time_baseline = np.zeros_like(total_time_gibb_sampl)
     list_df = []
-    rep = 5
+    rep = 1
     for r in range(rep):
         print("\n\nREPETITION: ", r, "\n")
         df = pd.DataFrame(columns=['n_train', 'dim', 'p_seen', 'time_my', 'time_skl', 'time_bsl'])
@@ -1078,9 +1093,13 @@ def plot_some_graph_2():
                 masks = np.array([np.random.binomial(1, 1-pr, (n_j, d_i)) for pr in list_p_seen])
                 masks = np.cumsum(masks, axis=0)  # each round
                 masks[masks>1] = 1
+
+                masks = np.array([make_masks_mnar(n_j, d_i, pr, 0.5) for pr in list_p_seen_true]) 
+                
                 for k, p_k in enumerate(list_p_seen_true):
                     print("\n\n CURRENT PROBABILITY ", p_k)
                     M = masks[k, :, :]
+                    print("check the masks ", M[0:8, 0:8])
                     for ii in range(d_i):
                         nbr = np.random.randint(0, n_j)
                         #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
