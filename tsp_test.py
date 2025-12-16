@@ -1,9 +1,9 @@
 import numpy as np
 import time
-from tsp import swm_formula, matrix_switches, split_upd, make_mask_with_bounded_flip
-from tsp import rk_1_update_inverse, impute_matrix_under_parametrized
-from tsp import gibb_sampl_no_modification, gibb_sampl, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
-from utils import flip_matrix_manual
+from generate import generate_mask_with_bounded_flip
+from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
+from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
+from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
@@ -16,7 +16,7 @@ def test_flip_matrix():
     M = np.random.binomial(1, 0.5, size=(n, d))
     M_s = csr_matrix(M)
     ones_d = np.ones(d)
-    FF = n * ones_d - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = n * ones_d - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
     F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
     MM = flip_matrix_manual(M.T)
     np.testing.assert_allclose(F, MM)
@@ -146,7 +146,7 @@ def test_gibb_sampl_no_modification():
     #M = np.random.binomial(1, 0.01, size=(n, d))
     exponent = (n ** (3/4)) / n
     #print("exponent", exponent)
-    M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
+    M = generate_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
     #print("masks in test gibb sampl no modification\n", M)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
@@ -205,7 +205,8 @@ def test_gibb_sampl_under_parametrized():
         'recomputation': False,
         'batch_size': 64,
         'verbose': 0,
-        'initial_strategy': 'constant'
+        'initial_strategy': 'constant',
+        'exponent_d': 0.75
     }
     start_time_gibb_sampl = time.time()
     X_my = gibb_sampl_under_parametrized(info_dic)
@@ -223,17 +224,17 @@ def test_gibb_sampl_under_parametrized():
     print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
     #if not info_dic['tsp']:
     np.testing.assert_allclose(X_my, res4)
-    print("test gibb sampl under parametr ended successfully")
+    print("test gibb sampl under parametr ended successfully\n")
 
 
 def test_gibb_sampl_over_parametrized():
-    print("test gibb sample over parametr started")
-    n = 20
-    d = 30
-    lbd = 1 + 0.0
+    print("\ntest gibb sample over parametr started")
+    n = 39
+    d = 55
+    lbd = 1.6321 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     #X_orig = np.random.rand(n, d) + 0.0
-    print(X_orig.dtype)
+    #print(X_orig.dtype)
     #print("max min ")
     mean = np.mean(X_orig, axis=0)
     std = np.std(X_orig, axis=0)
@@ -268,7 +269,8 @@ def test_gibb_sampl_over_parametrized():
         'recomputation': False,
         'batch_size': 64,
         'verbose': 0,
-        'initial_strategy': 'mean'
+        'initial_strategy': 'mean',
+        'exponent_d': 0.75
     }
     res = gibb_sampl_over_parametrized(info_dic)
     #res_std = gibb_sampl(info_dic)

@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import eigh
-
+import copy
 from generate import generate_masks
 
 np.random.seed(43)
@@ -37,12 +37,21 @@ print(m)
 idx = 1
 X = np.random.randint(0, 5, (3, 4)) + 0.0
 x = np.random.randint(5, 9,   np.sum(m[:, idx]  )   )  + 0.0
-print(X)
+X_nan = X.copy() 
+print("X\n", X)
 print(x)
 X[m[:, idx] == 1, idx] = x
 print(X)
 
 print(x.shape)
+X_nan[m==1] = np.nan
+print(X_nan)
+
+res = np.nanvar(X_nan, axis=0)
+#res1 = np.nanvar(X, axis=0)
+print("res : ", res)
+# print("res1: ", res1)
+
 
 
 

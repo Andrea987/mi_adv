@@ -82,4 +82,37 @@ def generate_masks(dictio_data):#nbr_of_sample, dim, p_missing):
 
 
 
+def generate_mask_with_bounded_flip(n, d, p_miss, p_flip):
+    M = np.zeros((n, d))
+    #print(M)
+    mask = np.random.binomial(1, p_miss, size=n)
+    #print("first mask in make mask with bounded flip", mask)
+    for i in range(d):
+        M[:, i] = mask
+        flip = np.random.binomial(1, p_flip, size=n)
+        #print(flip)
+        mask = (mask + flip) % 2
+    ones = np.ones((d, d)) 
+    F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = flip_matrix(M.T)
+    #print("flip matrix in make mask with bounded flip\n", F)
+    #permutation, distance = solve_tsp_local_search(F)
+    #print(permutation, distance)
+    #print("test Flip matrix \n", FF)
+    return M        
+
+
+
+def generate_masks_mnar(n, d, perc_seen, frequency_missing):
+    #  p: probability seen
+    #  frequency_missing is the probability that one column has missing components
+    l = int(n * perc_seen)
+    M = np.zeros((n, d))
+    m = np.random.binomial(1, frequency_missing, size=d)
+    for i in range(d):
+        if m[i] == 0:
+            M[0:l, i] = 1
+    return M
+
+
 

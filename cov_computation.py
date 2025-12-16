@@ -29,7 +29,7 @@ def cov_strategy(info, dict_observations):
       S = np.diag(sd)
     elif info['cov_strategy'] == 'std_nan':
       if info['imp_method'] in ['oracle']:
-        print("DON'T USE std_nan with oracle and ld because you do not have any nan. Use sd")
+        print("DON'T USE std_nan with oracle and listwise_deletion because you do not have any nan. Use sd")
       else:
         std_columnwise = np.nanstd(X_nan, axis=0)
         S = np.diag(std_columnwise)

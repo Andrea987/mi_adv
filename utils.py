@@ -6,6 +6,7 @@ from itertools import product
 def generate_binary_arrays(n):
     return np.array(list(product([0, 1], repeat=n)))
 
+
 def best_predictor(X, coeff, y):
   hat_y = (X @ coeff).T  # (n, d) @ (d, m) = (n, m)
   r = hat_y - y  # residual
@@ -13,6 +14,7 @@ def best_predictor(X, coeff, y):
   print("scores:  ", score)
   i_min = np.argmin(score)
   return coeff[:, i_min], score[i_min]
+
 
 def best_idx_predictor(X, coeff, y):
   hat_y = (X @ coeff).T  # (n, d) @ (d, m) = (n, m)
@@ -171,6 +173,12 @@ def update_inverse_rk2_sym(A_inv, W):
     return (res + res.T) / 2
 
 
+def split_upd(X, ms):
+    # split the 1 rank perturbations in updates and downdates
+    X_upd = X[ms == 1, :]
+    X_dwd = X[ms == -1, :]
+    return X_upd, X_dwd
+    #return {'+': X_upd, '-': X_dwd}
 
 
 

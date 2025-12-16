@@ -2,7 +2,6 @@
 
 
 
-
 def make_dictionary_data(nbr_experiments, n_train, n_test, data, beta_gt, p_miss, err_vector, plots):
   # make a dictionary where each element is a list of nbr_experiments element made by the other element of the function
   if isinstance(n_train, int):  # in case n_train is just a number
@@ -36,11 +35,13 @@ def make_dictionary_data(nbr_experiments, n_train, n_test, data, beta_gt, p_miss
 
   return dictio
 
+
 def make_probabilities(list_prob):
   l = []
   for x in list_prob:
     l.append([x, 0.5 - x/2, 0.5 - x/2])
   return l
+
 
 def make_info_axis(vector, name):
   if name == 'train':
@@ -52,6 +53,7 @@ def make_info_axis(vector, name):
   else:
     print("wrong info_axis")
   return dictio
+
 
 def make_dictionary_method(list_meth):
   # make a dictionary where each element is a list of nbr_experiments element made by the other element of the function
