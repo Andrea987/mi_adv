@@ -181,4 +181,26 @@ def split_upd(X, ms):
     #return {'+': X_upd, '-': X_dwd}
 
 
+def split_up_fx_dw(X, ms):
+    # split the 1 rank perturbations in updates and downdates
+    X_up = X[ms == 1, :]
+    X_fx = X[ms == 0, :]
+    X_dw = X[ms == -1, :]
+    return X_up, X_fx, X_dw
+    #return {'+': X_upd, '-': X_dwd}
 
+
+def s(C, v):
+   # compute s(C, v) such that (CˆT - v1ˆT)(C - 1vˆT) = C^TC + s(C, v)
+   # C = [c1| ... | cns]^T is (ns, d), v is (, d)
+   ns, d = C.shape 
+   u = np.ones(ns)
+   C_1_v = np.outer(C.T @ u, v)
+   return -C_1_v -C_1_v.T + ns * np.outer(v, v)
+
+
+def update_covariance(Cov1, C1, C2, v1, v2, U, D):
+    return Cov1 - s(C1, v1) + U.T @ U - D.T @ D + s(C2, v2)
+
+#def update_covariance(Cov_old, C_old, C_new, v_old, v_new, U, D):
+#    return Cov_old - s(C_old, v_old) + U.T @ U - D.T @ D + s(C_new, v_new)

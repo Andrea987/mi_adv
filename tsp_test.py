@@ -3,7 +3,7 @@ import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
-from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd
+from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
@@ -83,6 +83,55 @@ def test_split_upd():
     #print("v pl \n", vpl)
     #print("v mn \n", vmn)
     print("end test split upd ended successfully\n\n")
+
+
+def test_s():
+    print("test_s started")
+    n, d = 40, 6
+    C = np.random.randint(0, 5, (n, d)) + 0.0
+    v = np.random.randint(0, 5, d) + 0.0
+    u = np.ones(n)
+    print(C)
+    CC = C - np.outer(u, v)
+    print(v)
+    print(CC)
+    S = CC.T @ CC 
+    S_test = C.T @ C + s(C, v)
+    print(S_test)
+    np.testing.assert_allclose(S, S_test)
+    print("test_s ended successfully")
+
+
+def test_update_covariance():
+    print("test update covariance started")
+    n, d = 6, 4
+    nu = 3  # nd <= n 
+    C1 = np.random.randint(0, 5, (n, d)) + 0.0
+    v1 = np.random.randint(0, 5, d) + 0.0   
+    C_upd = np.random.randint(0, 5, (nu, d)) + 0.0
+    v2 = np.random.randint(0, 5, d) + 0.0
+    m = np.array([1, 1, -1, 1, -1, 1])
+    nd = np.sum(m == -1)
+    C_fix, C_dwd = split_upd(C1, m) 
+    C2 = np.vstack((C_fix, C_upd))
+    print("C2 shape ", C2.shape)
+
+    u1 = np.ones(n)
+    u2 = np.ones(n - nd + nu)
+
+    C11 = C1 - np.outer(u1, v1)
+    Cov1 = C11.T @ C11
+
+    C22 = C2 - np.outer(u2, v2)
+    Cov2 = C22.T @ C22
+
+    Cov2_test = update_covariance(Cov1, C1, C2, v1, v2, C_upd, C_dwd)
+    np.testing.assert_allclose(Cov2, Cov2_test)
+    print("test update covariance ended successfully")
+
+
+test_update_covariance()
+input()
 
 
 def test_rk_1_update_inverse():
@@ -283,12 +332,14 @@ def test_gibb_sampl_over_parametrized():
     res_skl = ice_skl.fit_transform(X_nan)
     np.testing.assert_allclose(res, res_skl)
     print("check skl vs my under parametrized passed successfully")
+    print("test gibb sample over parametr ended successfully")
 
 
 test_flip_matrix()
 test_split_upd()
 test_swm()
 test_split_upd()
+test_s()
 test_rk_1_update_inverse()
 test_impute_matrix_under_parametrized()
 test_gibb_sampl_no_modification()

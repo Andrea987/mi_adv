@@ -2,6 +2,7 @@ import numpy as np
 from scipy.linalg import eigh
 import copy
 from generate import generate_masks
+from utils import split_upd
 
 np.random.seed(43)
 
@@ -53,8 +54,24 @@ print("res : ", res)
 # print("res1: ", res1)
 
 
+print("new tests 1 \n ")
+n = 5
+d = 3
+X = np.random.randint(0, 5, size=(n, d)) + 0.0
+v = np.random.randint(0, 5, size=n) + 0.0 
+m = np.array([1, 1, 1, 1, -1])
+Xu, Xd = split_upd(X, m)
+print(X)
+print("Xu\n ", Xu.shape)
+print("Xd\n ", Xd.shape)
+U = Xu.T @ Xu - Xd.T @ Xd 
+print(U)
 
 
+print("other new test ")
+a = np.array([1, 2])
+sample = np.random.multivariate_normal(mean = a, cov = 2.2 * np.eye(2))
+print(sample)
 
 
 
