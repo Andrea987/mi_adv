@@ -332,8 +332,13 @@ def gibb_sampl_under_parametrized_sampling(info):
     M = info['masks']
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
-    X = imp_mean.fit_transform(X_nan)
+    initial_imputation = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = initial_imputation.fit_transform(X_nan)
+    if X.shape[1] == 2:
+        plt.scatter(X[:, 0], X[:, 1])
+        plt.scatter(X[M[:, 0] == 1, 0], X[M[:, 0] == 1, 1])
+        plt.scatter(X[M[:, 1] == 1, 0], X[M[:, 1] == 1, 1])
+        plt.show()
     #print("simple imputer in gibb sample under param \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
@@ -401,8 +406,17 @@ def gibb_sampl_under_parametrized_sampling(info):
     counter_recomputation = 0
     counter_swm_formula = 0 
     counter_reinversion = 0
+    old_X = X
     print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
+        diff = np.sum((X - old_X)**2)
+        old_X = X
+        print("\ndifference old vs new \n", np.sqrt(diff))
+        if X.shape[1] == 2:
+            plt.scatter(X[:, 0], X[:, 1])
+            plt.scatter(X[M[:, 0] == 1, 0], X[M[:, 0] == 1, 1])
+            plt.scatter(X[M[:, 1] == 1, 0], X[M[:, 1] == 1, 1])
+            plt.show()
         for i in range(d):
             X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov, Q, M, i)
             print("stopppp")
@@ -540,7 +554,7 @@ def test_gibb_sampl_under_parametrized_sampling():
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
     d = 2
-    lbd = 0.01 + 0.0
+    lbd = 0.001 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
@@ -551,23 +565,26 @@ def test_gibb_sampl_under_parametrized_sampling():
     X = (X_orig - mean) / std
     X = X_orig
     X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
+    #print(np.max(X))
+    #print(np.min(X))
     if d == 2:
-        mean = np.array([0, 0])
-        cov = np.array([[1, 0],[0, 1]])
+        mean = np.array([4, -5])
+        cov = np.array([[4, -0.95],[-0.95, 0.25]])
         X = np.random.multivariate_normal(mean, cov, size=n)
-    M = np.random.binomial(1, 0.1, size=(n, d))
+    M = np.random.binomial(1, 0.8, size=(n, d))
     for i in range(n):
         if np.sum(M[i, :]) == 0:
-            M[i, 0] = 0
+ #           ss = np.random.rand()
+ #           print(ss)
+#            input()
+            M[i, 0] = 0 if np.random.rand()>0.5 else 1
     #exponent = (n ** (3/4)) / n
     #print("exponent", exponent)
     #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     print("X_nan \n", X_nan)
-    R = 100
+    R = 10
     info_dic = {
         'data': X,
         'masks': M,
@@ -584,8 +601,8 @@ def test_gibb_sampl_under_parametrized_sampling():
     X_my = gibb_sampl_under_parametrized_sampling(info_dic)
     if d == 2:
         plt.scatter(X_my[:, 0], X_my[:, 1])
-        plt.scatter(X_my[M[:, 0] == 1, 0], X_my[M[:, 0] == 1, 0])
-        plt.scatter(X_my[M[:, 1] == 1, 0], X_my[M[:, 1] == 1, 0])
+        plt.scatter(X_my[M[:, 0] == 1, 0], X_my[M[:, 0] == 1, 1])
+        plt.scatter(X_my[M[:, 1] == 1, 0], X_my[M[:, 1] == 1, 1])
         plt.show()
     #end_time_gibb_sampl = time.time()
     #print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
