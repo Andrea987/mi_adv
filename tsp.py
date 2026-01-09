@@ -18,6 +18,8 @@ from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, s
 from utils import s as s_prod
 from serialization import serialization_first_idea
 import copy
+from hyppo.ksample import Energy
+import ot
 
 
 def gibb_sampl_no_modification(info):
@@ -329,16 +331,17 @@ def gibb_sampl(info):
 def gibb_sampl_under_parametrized_sampling(info):
     # flip matrix
     X = info['data']
+    original_X = X
     M = info['masks']
+    if original_X.shape[1] == 2:
+        plt.scatter(original_X[:, 0], original_X[:, 1])
+        plt.scatter(original_X[M[:, 0] == 1, 0], original_X[M[:, 0] == 1, 1])
+        plt.scatter(original_X[M[:, 1] == 1, 0], original_X[M[:, 1] == 1, 1])
+        plt.show()
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     initial_imputation = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = initial_imputation.fit_transform(X_nan)
-    if X.shape[1] == 2:
-        plt.scatter(X[:, 0], X[:, 1])
-        plt.scatter(X[M[:, 0] == 1, 0], X[M[:, 0] == 1, 1])
-        plt.scatter(X[M[:, 1] == 1, 0], X[M[:, 1] == 1, 1])
-        plt.show()
     #print("simple imputer in gibb sample under param \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
@@ -409,9 +412,16 @@ def gibb_sampl_under_parametrized_sampling(info):
     old_X = X
     print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
-        diff = np.sum((X - old_X)**2)
         old_X = X
-        print("\ndifference old vs new \n", np.sqrt(diff))
+        #diff = np.sum((X - old_X)**2)
+        stat, pvalue = Energy().test(original_X, old_X)
+        print("stat ", stat , "p value ", pvalue)
+        aa, bb = np.ones((n,)) / n, np.ones((n,)) / n
+        MM = ot.dist(original_X, old_X)
+        G0 = ot.sinkhorn2(aa, bb, MM, 0.1)
+        print("G0 ", G0)
+        input()
+        #print("\ndifference old vs new \n", np.sqrt(diff))
         if X.shape[1] == 2:
             plt.scatter(X[:, 0], X[:, 1])
             plt.scatter(X[M[:, 0] == 1, 0], X[M[:, 0] == 1, 1])
@@ -533,6 +543,40 @@ def gibb_sampl_under_parametrized_sampling(info):
     return X
 
 
+def gibb_sampl_over_parametrized_sampling(info):
+    ## Gibb sampling in an overparametrized setting
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample overparametrized \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    nbr_it_gs = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape  # suppose n < d
+    X_del = np.delete(X, 0, axis=1)
+    K = X_del @ X_del.T + lbd * np.eye(n)  # (n, n)
+    K_inv = np.linalg.inv(K)
+    for h in range(nbr_it_gs):
+        for i in range(d):
+            #print("index ", i)
+            #idx = i if i<d-1 else 0
+            X = impute_matrix_overparametrized(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
+            #print("round ", i, ": imputed matrix gs overp\n", X)
+            if h < nbr_it_gs-1 or i < d-1:
+                v_to_add = X[:, i]
+                v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
+                K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
+                #if i == d-1:
+                #    v_to_remove = X[:, 0]
+                K_inv = swm_formula(K_inv, v_to_add, 1.0)
+                K_inv = swm_formula(K_inv, v_to_remove, -1.0)
+    return X
+
 
 
 
@@ -549,11 +593,12 @@ def test_gibb_sampl_under_parametrized_sampling():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
     print("test gibb sampl under parametr started")
-    n = 100
+    n = 200
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 2
+    d = 10
+    gaussian = True
     lbd = 0.001 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
@@ -571,7 +616,16 @@ def test_gibb_sampl_under_parametrized_sampling():
         mean = np.array([4, -5])
         cov = np.array([[4, -0.95],[-0.95, 0.25]])
         X = np.random.multivariate_normal(mean, cov, size=n)
-    M = np.random.binomial(1, 0.8, size=(n, d))
+    if gaussian:
+        mean = np.random.rand(d)
+        cov = np.random.rand(n, d)
+        cov = cov.T @ cov + np.eye(d) * 0.1
+        #print(cov)
+        X = np.random.multivariate_normal(mean, cov, size=n)
+        #print(X)
+        #input()
+    M = np.random.binomial(1, 0.5, size=(n, d))
+    print(M)
     for i in range(n):
         if np.sum(M[i, :]) == 0:
  #           ss = np.random.rand()
@@ -592,7 +646,7 @@ def test_gibb_sampl_under_parametrized_sampling():
         'lbd_reg': lbd,
         'tsp': False,
         'recomputation': False,
-        'batch_size': 64,
+        #'batch_size': 64,
         'verbose': 0,
         'initial_strategy': 'constant',
         'exponent_d': 0.75

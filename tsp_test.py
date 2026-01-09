@@ -8,6 +8,7 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
 from scipy.sparse import csr_matrix
+from hyppo.ksample import Energy
 
 
 def test_flip_matrix():
