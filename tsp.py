@@ -558,14 +558,25 @@ def gibb_sampl_over_parametrized_sampling(info):
     nbr_it_gs = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape  # suppose n < d
-    X_del = np.delete(X, 0, axis=1)
+    R = X[M[:, 0] == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    start_gibb_s = time.time()
+    mean = np.mean(R, axis=0)
+    
+    #print(a)
+    #print("\n", np.outer(u, a))
+    R_centered = R - np.outer(u, mean)
+
+    u = np.ones(X.shape[0])
+    X_del = np.delete(X - np.outer(u, mean), 0, axis=1)
     K = X_del @ X_del.T + lbd * np.eye(n)  # (n, n)
-    K_inv = np.linalg.inv(K)
+    #K_inv = np.linalg.inv(K)
     for h in range(nbr_it_gs):
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
-            X = impute_matrix_overparametrized(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
+            X = impute_matrix_overparametrized_sampling(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
             #print("round ", i, ": imputed matrix gs overp\n", X)
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
