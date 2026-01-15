@@ -68,6 +68,7 @@ def swm_formula(Q, U, c):
     # sherman woodbury morrison formula
     # compute the inverse of (Q + c*U.T@U)ˆ(-1)
     if U.ndim == 1 or U.shape[0] == 1 or U.shape[1] == 1:
+        #print("rk 1 modification")
         ret = rk_1_update_inverse(Q, U, c)
     else:
         d, m = U.shape  # U = [u_1|..|u_m], size = (d, m)

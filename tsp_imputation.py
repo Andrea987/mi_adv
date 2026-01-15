@@ -131,7 +131,7 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
 
 
 
-def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
+def impute_matrix_under_parametrized_sampling_max_likelihood(XX, mu, S, Q, M, i):
     # XX input matrix
     # mu current mean
     # S current covariance matrix
@@ -196,10 +196,77 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
 
 
 
+def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
+    # XX input matrix
+    # mu current mean
+    # S current covariance matrix
+    # Q current inverse of S, i.e. Q = (X.T@X + lbd*Id)^(-1)
+    # M masks, 0 seen, 1 missing
+    # i current iteration when sweeping the column
+    X = XX.copy()
+    #print("masks \n", M)
+    n, d = X.shape
+    xi = X[:, i]
+    X_i = np.delete(X, i, axis=1)
+    Q_i = np.delete(Q, i, axis=0)
+    S_i = np.delete(S, i, axis=1)
+    mu_i = np.delete(mu, i, axis=0)
+    v = np.zeros(d-1)
+    v = -(1 / Q[i, i]) * Q_i[:, i]
+
+    check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
+    #print("v       ", v)
+    #print("check_v ", check_v)
+
+    S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
+    S_current = 1 / Q[i, i]
+    #if ml_or_bs == 'bayes':
+    #    S_current = v / np.sum(M[:, i])  # the conditional variance is rescaled by the number of seen components  
+    #print("S_current      ", S_current)
+    #print("S_current check", S_current_check)
+
+    #if i == 0:
+    #    v = -(1/Q[0, 0]) * Q[1:, 0]
+    #elif i== d:
+    #    v = -(1/Q[d, d]) * Q[0:d-1, 0]
+    #else:
+    #    v[0:i] = Q[0:i, 0]
+    #    v[(i+1):d] = Q[(i+1):d, 0]
+    #    v = -(1/Q[i, i]) * v
+    u = np.ones(n)
+    prediction = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
+
+    prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
+    #print(prediction.shape)
+    #print("S_current ", S_current)
+    sample = np.random.multivariate_normal(mean = prediction, 
+                                           cov = S_current * np.eye(n))
+    #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
+    #thr = 1.8
+    #prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
+    #print(v[:, None])
+    #print("test in impute matrix, who is v\n ", v)
+    #print(-Q * (1 / Q[i, i]))
+    #print(prediction, prediction.shape)
+    #print(prediction.squeeze())
+    #print(X[:, i])
+    #print(M[:, i])
+    #print(X[:, i] * (1 - M[:, i]))
+    #print(prediction * M[:, i])
+    # print(X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i])
+    # print(X[:, i])
+    X[:, i] = X[:, i] * (1 - M[:, i]) + sample.squeeze() * M[:, i] + 0.0
+    #X[:, i] = X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i]
+    #X[:, i] = np.zeros_like(X[:, i])
+    #print("new X\n", X)
+    return X, v  # imputed matrix, coeff
 
 
-def impute_matrix_over_parametrized_sampling(K):#XX, mu, S, Q, M, i):
+
+
+def impute_matrix_over_parametrized_sampling(K, idx):#XX, mu, S, Q, M, i):
     # K: kernel matrix
+    # idx: current imputed index
     n_m = np.sum(M[:, idx])  #  nbr missing, M_ij = 1 iff component is missing
     n_s = np.sum(1-M[:, idx])
     _, d = X.shape
@@ -210,7 +277,8 @@ def impute_matrix_over_parametrized_sampling(K):#XX, mu, S, Q, M, i):
 
     X_idx = X[:, idx]
     X_s = X_idx[M[:, idx] == 0]  # (n_s,)
-    A = K_inv[M[:, idx] == 1][:, M[:, idx] == 0]  # (n_m, n_s)
+    mask_seen = M[:, idx]
+    A = K[M[:, idx] == 1][:, M[:, idx] == 0]  # (n_m, n_s)
     #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
     if A.ndim == 1:
         A = np.array([A])
