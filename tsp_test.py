@@ -4,6 +4,7 @@ from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
+from utils import make_centered_kernel_matrix
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
@@ -131,8 +132,32 @@ def test_update_covariance():
     print("test update covariance ended successfully")
 
 
-test_update_covariance()
+def test_make_centered_covariance_matrix():
+    print("test_make_centered_covariance_matrix begun")
+    n, d = 3, 5
+    gaussian = True
+    lbd = 0.98765 + 0.0
+    X = np.random.rand(n, d) + 0.0
+    M = np.random.binomial(1, 0.3, size=(n, d))
+    R = X[M[:, 0] == 0, :]
+    mean = np.mean(R, axis=0)
+    ms = (1 - M[:, 0]) / np.sum(1 - M[:, 0])
+    u = np.ones(X.shape[0])
+    A = np.eye(n) - np.outer(u, ms)
+    X_del = np.delete(X, 0, axis=1)
+    K = X_del @ X_del.T
+    K_centered = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd
+    X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
+    K_centered_test = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)    
+    K_centered_test2 = A @ K @ A.T + np.eye(n) * lbd 
+    np.testing.assert_allclose(K_centered, K_centered_test)
+    np.testing.assert_allclose(K_centered, K_centered_test2)
+    print("test_make_centered_covariance_matrix ended successufully")
+
+test_make_centered_covariance_matrix()
 input()
+test_update_covariance()
+
 
 
 def test_rk_1_update_inverse():

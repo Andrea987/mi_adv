@@ -203,5 +203,29 @@ def s(C, v):
 def update_covariance(Cov1, C1, C2, v1, v2, U, D):
     return Cov1 - s(C1, v1) + U.T @ U - D.T @ D + s(C2, v2)
 
+
+def make_centered_kernel_matrix(K, m):
+    # given a kernel matrix K = X @ X.T and a mask k,
+    # compute K_cent = (X - 1 @ mu.T) @ (X - 1 @ mu.T).T,
+    # where mu is (X @ (1-m)) / np.sum(1-m) is the mean of a
+    # subsample of X
+    # m is a mask, such that m[i] = 0 iff component is seen, 0 otherwise
+    ms = (1 - m) / np.sum(1 - m)
+    u = np.ones(K.shape[0])
+    w = K @ ms
+    sw = np.outer(w, u) + np.outer(u, w)
+    return K - sw + np.outer(u, u) * np.sum(w * ms)
+    
+
+def compute_stats(X, m, lbd):
+    n, d = X.shape
+    R = X[m==0, :]
+    mean = np.mean(R, axis=0)
+    u = np.ones(R.shape[0])
+    R_centered = R - np.outer(u, mean)
+    Cov = R_centered.T @ R_centered + lbd * np.eye(d)
+    K = R_centered @ R_centered.T + lbd * np.eye(n)
+
+
 #def update_covariance(Cov_old, C_old, C_new, v_old, v_new, U, D):
 #    return Cov_old - s(C_old, v_old) + U.T @ U - D.T @ D + s(C_new, v_new)

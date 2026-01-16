@@ -128,9 +128,7 @@ def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     return X
 
 
-
-
-
+'''
 def impute_matrix_under_parametrized_sampling_max_likelihood(XX, mu, S, Q, M, i):
     # XX input matrix
     # mu current mean
@@ -193,7 +191,7 @@ def impute_matrix_under_parametrized_sampling_max_likelihood(XX, mu, S, Q, M, i)
     #X[:, i] = np.zeros_like(X[:, i])
     #print("new X\n", X)
     return X, v  # imputed matrix, coeff
-
+'''
 
 
 def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
@@ -239,8 +237,10 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
     prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
     #print(prediction.shape)
     #print("S_current ", S_current)
+
     sample = np.random.multivariate_normal(mean = prediction, 
                                            cov = S_current * np.eye(n))
+
     #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
     #thr = 1.8
     #prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
@@ -263,12 +263,12 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
 
 
 
-
-def impute_matrix_over_parametrized_sampling(K, idx):#XX, mu, S, Q, M, i):
+def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling):#XX, mu, S, Q, M, i):
     # K: kernel matrix
     # idx: current imputed index
-    n_m = np.sum(M[:, idx])  #  nbr missing, M_ij = 1 iff component is missing
-    n_s = np.sum(1-M[:, idx])
+    # m: current_mask
+    n_m = np.sum(m)  #  nbr missing, M_ij = 1 iff component is missing
+    n_s = np.sum(1-m)
     _, d = X.shape
 
     #print("K\n", K)
@@ -276,9 +276,8 @@ def impute_matrix_over_parametrized_sampling(K, idx):#XX, mu, S, Q, M, i):
     #print("nplinalg.inv(K)\n", np.linalg.inv(K))
 
     X_idx = X[:, idx]
-    X_s = X_idx[M[:, idx] == 0]  # (n_s,)
-    mask_seen = M[:, idx]
-    A = K[M[:, idx] == 1][:, M[:, idx] == 0]  # (n_m, n_s)
+    X_s = X_idx[m == 0]  # (n_s,)
+    A = K[m == 1][:, m == 0]  # (n_m, n_s)
     #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
     if A.ndim == 1:
         A = np.array([A])
@@ -292,73 +291,62 @@ def impute_matrix_over_parametrized_sampling(K, idx):#XX, mu, S, Q, M, i):
         #print("C \n", C)
         #S_C = C[0:n_m, 0:n_m]  #  Schur Complement
         #print(K_inv)
-        S_C = K_inv[M[:, idx] == 1, :][:, M[:, idx] == 1]
+        S_C = K_inv[m == 1, :][:, m == 1]  # (n_m, n_m)
         if S_C.ndim == 1:
             S_C = np.array([S_C])
         #print("S_C \n", S_C)
         #print("A\n", A)
         
         #print("X_s ", X_s)
-        x = np.linalg.solve(S_C, A @ X_s)
+        x = -np.linalg.solve(S_C, A @ X_s)
         #print("x\n ", x)
         #print("check ", np.sqrt( np.sum( (S_C @ x - A@X_s)**2) ) )
         #print("M \n ", M[:, idx])
         #X[M[:, idx] == 1, idx] = -x
-    X = XX.copy()
-    #print("masks \n", M)
-    n, d = X.shape
-    xi = X[:, i]
-    X_i = np.delete(X, i, axis=1)
-    Q_i = np.delete(Q, i, axis=0)
-    S_i = np.delete(S, i, axis=1)
-    mu_i = np.delete(mu, i, axis=0)
-    v = np.zeros(d-1)
-    v = -(1 / Q[i, i]) * Q_i[:, i]
+    else:  # many missing components, it's better to work with the the submatrix of seen components
+        #print("n_s < n_m")
+        K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
+        #print("K_S\n", K_S)
+        v = A @ X_s  # (n_m, n_s) * (n_s,) = (n_m,) 
+        X_del = np.delete(X, idx, axis=1)
+        Xm = X_del[m == 1, :]  # (n_m, d-1) 
+        Xs = X_del[m == 0, :]  # (n_s, d-1)
+        #print("Xs @ Xs.T + lbd * Id\n", Xs @ Xs.T + lbd * np.eye(n_s))
+        w = Xm.T @ v  # (d-1, n_m) * (n_m,) = (d-1,)
+        partial = w - Xs.T @ np.linalg.solve(K_S, Xs @ w ) 
+        x = Xm @ partial + lbd * v
+        x = - x
+    if sampling:
+        K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
+        x1 = np.linalg.solve(K_S + np.eye(n_s) * lbd, X_s)
+        cov_i_given_rest = (np.sum(X_s * X_s) - np.sum(X_s * (K_S @ x1))) / n_s 
 
-    check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
-    #print("v       ", v)
-    #print("check_v ", check_v)
+        R = X[m == 0, :]
+        cov_full = R.T @ R / n_s + np.eye(d)
+        Q = np.linalg.inv(cov_full)
+        cov_i_given_rest_test = 1 / Q[idx, idx]
+        Ri = R[:, idx]
+        R_i = np.delete(R, idx, axis=1)
+        w = Ri @ R_i 
+        print(w)
+        inv_cov = R_i.T @ R_i / n_s + lbd * np.eye(d-1)
+        cov_i_given_rest_test2 = np.sum(Ri * Ri) - np.sum(w * (inv_cov @ w))
 
-    S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
-    S_current = 1 / Q[i, i]
-    #print("S_current      ", S_current)
-    #print("S_current check", S_current_check)
+        print("cov i given rest ", cov_i_given_rest)
+        print("cov i given rest test", cov_i_given_rest_test)
+        print("cov i given rest test2", cov_i_given_rest_test2)
+        input()
 
-    #if i == 0:
-    #    v = -(1/Q[0, 0]) * Q[1:, 0]
-    #elif i== d:
-    #    v = -(1/Q[d, d]) * Q[0:d-1, 0]
-    #else:
-    #    v[0:i] = Q[0:i, 0]
-    #    v[(i+1):d] = Q[(i+1):d, 0]
-    #    v = -(1/Q[i, i]) * v
-    u = np.ones(n)
-    prediction = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
 
-    prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
-    print(prediction.shape)
-    print("S_current ", S_current)
-    sample = np.random.multivariate_normal(mean = prediction, 
-                                           cov = S_current * np.eye(n))
-    #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
-    #thr = 1.8
-    #prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
-    #print(v[:, None])
-    #print("test in impute matrix, who is v\n ", v)
-    #print(-Q * (1 / Q[i, i]))
-    #print(prediction, prediction.shape)
-    #print(prediction.squeeze())
-    #print(X[:, i])
-    #print(M[:, i])
-    #print(X[:, i] * (1 - M[:, i]))
-    #print(prediction * M[:, i])
-    # print(X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i])
-    # print(X[:, i])
-    X[:, i] = X[:, i] * (1 - M[:, i]) + sample.squeeze() * M[:, i] + 0.0
-    #X[:, i] = X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i]
-    #X[:, i] = np.zeros_like(X[:, i])
-    #print("new X\n", X)
-    return X, v  # imputed matrix, coeff
+
+
+
+        prediction = x
+        sample = np.random.multivariate_normal(mean = prediction, 
+                                           cov = cov_i_given_rest * np.eye(n_s))
+        x = sample
+    X[m == 1, idx] = x
+    return X
 
 
 

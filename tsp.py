@@ -13,9 +13,11 @@ from scipy.linalg import cho_factor, cho_solve
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 import pandas as pd
-from tsp_imputation import impute_matrix_overparametrized, impute_matrix_under_parametrized_sampling, impute_matrix_under_parametrized_sampling_max_likelihood
+from tsp_imputation import impute_matrix_overparametrized, impute_matrix_under_parametrized_sampling
+from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_over_parametrized_sampling
 from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, swm_formula, split_upd, split_up_fx_dw, update_covariance
 from utils import s as s_prod
+from utils import make_centered_kernel_matrix
 from serialization import serialization_first_idea
 import copy
 from hyppo.ksample import Energy
@@ -856,29 +858,56 @@ def gibb_sampl_over_parametrized_sampling(info):
     lbd = info['lbd_reg']
     n, d = X.shape  # suppose n < d
     R = X[M[:, 0] == 0, :]
+    print("R \n", R)
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
     start_gibb_s = time.time()
     mean = np.mean(R, axis=0)
-    
-    #print(a)
-    #print("\n", np.outer(u, a))
-    R_centered = R - np.outer(u, mean)
-
+    ms = (1 - M[:, 0]) / np.sum(1 - M[:, 0])
+    print(ms)
     u = np.ones(X.shape[0])
+    A = np.eye(n) - np.outer(u, ms)
+    X_centered = X - np.outer(u, mean)
+    X_centered_test = A @ X
+    X_del = np.delete(X, 0, axis=1)
+    print(X_del)
+    K = X_del @ X_del.T  #+ np.eye(n) * lbd
+    K_reg = K + np.eye(n) * lbd
+    print(np.outer(u, mean))
+    print("X_del\n ", X_del)
     X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
-    K = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
-    #K_inv = np.linalg.inv(K)
+    print("X_del_centered\n ", X_del_centered)
+    K_centered_test = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
+    #ns = np.sum(ms)
+    
+    X_centered_test = A @ X
+    print("X_cecntered-test\n", X_centered_test)
+    K_centered_test2 = A @ K @ A.T + np.eye(n) * lbd 
+    w = K @ ms
+    print("w ", w)
+    print("mean ", mean)
+    sw = np.outer(w, u) + np.outer(u, w)
+    print("sw ", sw)
+    #K_centered = K - sw + np.outer(u, u) * np.sum(w * ms) + np.eye(n) * lbd
+    K_centered_reg = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd
+    #K_centered = K - np.outer(u, w) - np.outer(w, u) + np.outer(u, u) * np.sum(w * ms)
+    print("K_centered \n",  K_centered_reg)
+    print("K_centered_test \n",  K_centered_test)
+    print("K_centered_test2 \n",  K_centered_test2)
+    K_centered_reg_inv = np.linalg.inv(K_centered_reg)
     for h in range(nbr_it_gs):
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
-            X = impute_matrix_overparametrized_sampling(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
+            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=True)
             #print("round ", i, ": imputed matrix gs overp\n", X)
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
                 v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
+                current_mask = M[:,(i+1)] if i<d-1 else M[:, 0]
                 K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
+                K_centered_reg = make_centered_kernel_matrix(K, current_mask) + np.eye(n) * lbd
+
                 #if i == d-1:
                 #    v_to_remove = X[:, 0]
                 K_inv = swm_formula(K_inv, v_to_add, 1.0)
@@ -888,14 +917,11 @@ def gibb_sampl_over_parametrized_sampling(info):
 
 
 
-
-
-
 def test_gibb_sampl_under_parametrized_sampling():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
     print("test gibb sampl under parametr started")
-    n = 100
+    n = 200
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
@@ -940,7 +966,7 @@ def test_gibb_sampl_under_parametrized_sampling():
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
-    R = 20
+    R = 10
     info_dic = {
         'data': X,
         'masks': M,
@@ -970,6 +996,89 @@ def test_gibb_sampl_under_parametrized_sampling():
     #ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     #start4 = time.time()   # tic
     #res4 = ice4.fit_transform(X_nan)
+
+
+def test_gibb_sampl_over_parametrized_sampling():
+    # the test consists in running IterativeImputer with Ridge Regression,
+    # and our handmade gibb sampling function
+    print("test gibb sampl under parametr started")
+    n = 3
+    print("sqrt n ", np.sqrt(n))
+    print("n ** (3/4)", n ** (3/4))
+    print("n ** (3/4) / n", (n ** (3/4)) / n)
+    d = 5
+    gaussian = True
+    lbd = 0.98765 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    #print("max min ")
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    # Standardize
+    X = (X_orig - mean) / std
+    X = X_orig
+    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    #print(np.max(X))
+    #print(np.min(X))
+    if d == 2:
+        mean = np.array([4, -5])
+        cov = np.array([[4, -0.95],[-0.95, 0.25]])
+        X = np.random.multivariate_normal(mean, cov, size=n)
+    if gaussian and d>2:
+        mean = np.random.rand(d)
+        cov = np.random.rand(n, d)
+        cov = cov.T @ cov + np.eye(d) * 0.5
+        #print(cov)
+        X = np.random.multivariate_normal(mean, cov, size=n)
+        #print(X)
+        #input()
+    M = np.random.binomial(1, 0.3, size=(n, d))
+    #print(M)
+    for i in range(n):
+        if np.sum(M[i, :]) == 0:
+ #           ss = np.random.rand()
+ #           print(ss)
+#            input()
+            M[i, 0] = 0 if np.random.rand()>0.5 else 1
+    #exponent = (n ** (3/4)) / n
+    #print("exponent", exponent)
+    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 2
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        #'batch_size': 64,
+        'verbose': 0,
+        'initial_strategy': 'constant',
+        'exponent_d': 0.75,
+        'ml_or_bs': 'bayesian'
+    }
+    #start_time_gibb_sampl = time.time()
+    X_my = gibb_sampl_over_parametrized_sampling(info_dic)
+    if d == 2:
+        plt.scatter(X_my[:, 0], X_my[:, 1])
+        plt.scatter(X_my[M[:, 0] == 1, 0], X_my[M[:, 0] == 1, 1])
+        plt.scatter(X_my[M[:, 1] == 1, 0], X_my[M[:, 1] == 1, 1])
+        plt.show()
+    #end_time_gibb_sampl = time.time()
+    #print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
+#    print(X_my) 
+    print("\nend my gibb sampling\n")
+    
+    print("It imputer Ridge Reg")
+    #ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
+    #start4 = time.time()   # tic
+    #res4 = ice4.fit_transform(X_nan)
+
+
 #    print("result IterativeImptuer with Ridge\n", res4)
     #end4 = time.time()     # toc
     #print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
@@ -979,6 +1088,7 @@ def test_gibb_sampl_under_parametrized_sampling():
 
 
 
-test_gibb_sampl_under_parametrized_sampling()
+#test_gibb_sampl_under_parametrized_sampling()
+test_gibb_sampl_over_parametrized_sampling()
 
 
