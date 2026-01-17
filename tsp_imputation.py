@@ -1,5 +1,5 @@
 import numpy as np
-
+from utils import compute_stats
 
 
 
@@ -319,60 +319,15 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
     if sampling:
         print("K\n ", K)  # K is the regularize centered kernel matrix
         K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
-        x1 = np.linalg.solve(K_S + np.eye(n_s) * lbd, Xs)
-        cov_i_given_rest = (np.sum(Xs * Xs) - np.sum(Xs * (K_S @ x1)))
-
-        ## you need to keep into account the mean, think about it tomorrow
-
-        R = X[m == 0, :]
-        meann = np.mean(R, axis=0)
-        u = np.ones(R.shape[0])
-        R_cen = R - np.outer(u, meann)
-        R_cen_del = np.delete(R_cen, idx, axis=1)
-        cov_full = R_cen.T @ R_cen + np.eye(d) * lbd
-        kernel_matr_test = R_cen_del @ R_cen_del.T + np.eye(n_s) * lbd
-        n = X.shape[0]
-        uu = np.ones(n)
-        X_del_centered = np.delete(X - np.outer(uu, meann), 0, axis=1)
-        print("X_del_centered\n ", X_del_centered)
-        K_centered_test = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
-        print("K centered test \n", K_centered_test)
-        print("kernel matr test \n", kernel_matr_test) 
-        print("K_S \n", K_S)
-        print("cof full\n ", cov_full)
-        Q = np.linalg.inv(cov_full)
-        cov_i_given_rest_test = 1 / Q[idx, idx]
-        Ri = R_cen[:, idx]
-
-        print("Ri ", Ri)
-        print("Xs ", X_s)
-
-        R_i = np.delete(R_cen, idx, axis=1)
-        w = Ri @ R_i 
-        print(w)
-        print("\n\n kernel \n", R_i @ R_i.T + np.eye(n_s) * lbd)
-        inv_cov = np.linalg.inv(R_i.T @ R_i + lbd * np.eye(d-1))
-        inv_kernel = np.linalg.inv(K_S)
-        first_matrix = R_i @ inv_cov @ R_i.T
-        cov_i_given_rest_test2 = np.sum(Ri * Ri) - np.sum( Ri * (first_matrix @ Ri)  ) + lbd
-        one = (R_i @ R_i.T @ Ri) * (inv_kernel @ Ri)
-        print("one ", one)
-        second_matrix = R_i @ R_i.T @ inv_kernel
-        print("first matrix \n", first_matrix)
-        print("second matrix \n", second_matrix)
-        cov_i_given_rest_test3 = np.sum(Ri * Ri) - np.sum(Ri * (second_matrix @ Ri)) + lbd
-        cov_i_given_rest_test4 = cov_full[idx, idx] - np.sum(one)
-        print("cov i given rest ", cov_i_given_rest)
-        print("cov i given rest test", cov_i_given_rest_test)
-        print("cov i given rest test2", cov_i_given_rest_test2)
-        print("cov i given rest test3", cov_i_given_rest_test3)
-        print("cov i given rest test4", cov_i_given_rest_test4)
+        Xss = X_s - np.mean(X_s)
+        print("test variacen ", np.sum(Xss * Xss))
+        print("Xss ", Xss)
+        x1 = np.linalg.solve(K_S, Xss)
+        K_S_not_reg = K_S - np.eye(n_s) * lbd
+        cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1))) + lbd
+        print("my cov ", cov_i_given_rest)
+        cov_test, _, _, _ = compute_stats(X, m, lbd, idx)
         input()
-
-
-
-
-
         prediction = x
         sample = np.random.multivariate_normal(mean = prediction, 
                                            cov = cov_i_given_rest * np.eye(n_s))

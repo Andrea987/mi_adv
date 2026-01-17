@@ -889,12 +889,15 @@ def gibb_sampl_over_parametrized_sampling(info):
     sw = np.outer(w, u) + np.outer(u, w)
     print("sw ", sw)
     #K_centered = K - sw + np.outer(u, u) * np.sum(w * ms) + np.eye(n) * lbd
-    K_centered_reg = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd
+    K_centered_reg, K_m, m_K_m = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd  # K_m means "K times m"
     #K_centered = K - np.outer(u, w) - np.outer(w, u) + np.outer(u, u) * np.sum(w * ms)
     print("K_centered \n",  K_centered_reg)
     print("K_centered_test \n",  K_centered_test)
     print("K_centered_test2 \n",  K_centered_test2)
+    np.testing.assert_allclose(K_centered_reg, K_centered_test)
+    np.testing.assert_allclose(K_centered_reg, K_centered_test2)
     K_centered_reg_inv = np.linalg.inv(K_centered_reg)
+    
     for h in range(nbr_it_gs):
         for i in range(d):
             #print("index ", i)
@@ -906,13 +909,24 @@ def gibb_sampl_over_parametrized_sampling(info):
                 v_to_add = X[:, i]
                 v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
                 current_mask = M[:,(i+1)] if i<d-1 else M[:, 0]
-                K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
-                K_centered_reg = make_centered_kernel_matrix(K, current_mask) + np.eye(n) * lbd
+                ms = (1 - current_mask) / np.sum(1 - current_mask)  # ms[i] = 1 iff component is seen
+                
+                K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_add, 1.0)
+                K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_remove, -1.0)
+                K_centered_reg_inv = swm_formula(K_centered_reg_inv, u * np.sqrt(m_K_m), -1.0)
+                U = np.array([K_m, u]).T
+                K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)  # now we should have K_reg_inv = (K + lbd Id)^(-1)
 
-                #if i == d-1:
-                #    v_to_remove = X[:, 0]
-                K_inv = swm_formula(K_inv, v_to_add, 1.0)
-                K_inv = swm_formula(K_inv, v_to_remove, -1.0)
+                K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
+                K_centered_reg, K_m, m_K_m = make_centered_kernel_matrix(K, current_mask) + np.eye(n) * lbd
+
+                A = np.eye(n) - np.outer(u, ms)
+                K_centered_reg_test2 = A @ K @ A.T + np.eye(n) * lbd
+
+                np.testing.assert_allclose(K_centered_reg, K_centered_reg_test2)
+
+                
+
     return X
 
 
@@ -1090,6 +1104,6 @@ def test_gibb_sampl_over_parametrized_sampling():
 
 
 #test_gibb_sampl_under_parametrized_sampling()
-test_gibb_sampl_over_parametrized_sampling()
+#test_gibb_sampl_over_parametrized_sampling()
 
 

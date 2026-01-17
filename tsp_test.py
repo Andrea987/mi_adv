@@ -4,7 +4,7 @@ from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
-from utils import make_centered_kernel_matrix
+from utils import make_centered_kernel_matrix, update_inverse_rk2_sym
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
@@ -155,9 +155,7 @@ def test_make_centered_covariance_matrix():
     print("test_make_centered_covariance_matrix ended successufully")
 
 test_make_centered_covariance_matrix()
-input()
 test_update_covariance()
-
 
 
 def test_rk_1_update_inverse():
@@ -175,6 +173,30 @@ def test_rk_1_update_inverse():
     np.testing.assert_allclose(Q_upd_inv, Q_tested)
     print("test rk_1 upd inverse ended successfully\n\n")
 
+
+def test_update_inverse_rk2_sym():
+    print("test_update_inverse_rk2_sym begin")
+    n, d = 10, 5
+    lbd = 1.01 + 0.0
+    X = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    A = X.T @ X
+    w = np.random.randint(-3, 3, size=d)
+    v = np.random.randint(-3, 3, size=d)
+    U = np.array([v, w]).T
+    A_inv = np.linalg.inv(A)
+    A_upd = A + np.outer(w, v) + np.outer(v, w)
+    A_upd_inv_true = np.linalg.inv(A_upd)
+    A_upd_inv = update_inverse_rk2_sym(A_inv, U)
+    np.testing.assert_allclose(A_upd_inv_true, A_upd_inv)
+
+    U_1 = np.array([v, -w]).T
+    A_upd_1 = A - np.outer(w, v) - np.outer(v, w)
+    A_upd_inv_true_1 = np.linalg.inv(A_upd_1)
+    A_upd_inv_1 = update_inverse_rk2_sym(A_inv, U_1)
+    np.testing.assert_allclose(A_upd_inv_true_1, A_upd_inv_1)
+    print("test_update_inverse_rk2_sym ended successfully")
+    
+test_update_inverse_rk2_sym()
 
 def test_impute_matrix_under_parametrized():
     print("\n\nbeginning test impute matrix ")
@@ -359,7 +381,6 @@ def test_gibb_sampl_over_parametrized():
     np.testing.assert_allclose(res, res_skl)
     print("check skl vs my under parametrized passed successfully")
     print("test gibb sample over parametr ended successfully")
-
 
 test_flip_matrix()
 test_split_upd()

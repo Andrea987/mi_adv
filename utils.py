@@ -205,7 +205,7 @@ def update_covariance(Cov1, C1, C2, v1, v2, U, D):
 
 
 def make_centered_kernel_matrix(K, m):
-    # given a kernel matrix K = X @ X.T and a mask k,
+    # given a kernel matrix K = X @ X.T and a mask m,
     # compute K_cent = (X - 1 @ mu.T) @ (X - 1 @ mu.T).T,
     # where mu is (X @ (1-m)) / np.sum(1-m) is the mean of a
     # subsample of X
@@ -214,18 +214,46 @@ def make_centered_kernel_matrix(K, m):
     u = np.ones(K.shape[0])
     w = K @ ms
     sw = np.outer(w, u) + np.outer(u, w)
-    return K - sw + np.outer(u, u) * np.sum(w * ms)
+    return K - sw + np.outer(u, u) * np.sum(w * ms), w, np.sum(w * ms) 
     
 
-def compute_stats(X, m, lbd):
+def compute_stats(X, m, lbd, idx):
+    # test function that compute some variances in different ways
     n, d = X.shape
     R = X[m==0, :]
     mean = np.mean(R, axis=0)
+    ns = np.sum(1-m)  # number seen
     u = np.ones(R.shape[0])
+    uu = np.ones(X.shape[0])
     R_centered = R - np.outer(u, mean)
+    R_centered_del = np.delete(R_centered, idx, 1)
+    X_centered = X - np.outer(uu, mean)
+    X_centered_del = np.delete(X_centered, idx, 1)
     Cov = R_centered.T @ R_centered + lbd * np.eye(d)
-    K = R_centered @ R_centered.T + lbd * np.eye(n)
+    K = X_centered_del @ X_centered_del.T + lbd * np.eye(n)
+    K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
+    K_S_test = R_centered_del @ R_centered_del.T + lbd * np.eye(ns)
+    np.testing.assert_allclose(K_S, K_S_test)
+    Q = np.linalg.inv(Cov)
+    cov_i_given_rest_test = 1 / Q[idx, idx]
 
 
-#def update_covariance(Cov_old, C_old, C_new, v_old, v_new, U, D):
-#    return Cov_old - s(C_old, v_old) + U.T @ U - D.T @ D + s(C_new, v_new)
+    Ri = R_centered[:, idx]
+    #R_i = np.delete(R_centered, idx, axis=1)
+    inv_cov = np.linalg.inv(R_centered_del.T @ R_centered_del + lbd * np.eye(d-1))
+    inv_kernel = np.linalg.inv(K_S)
+    first_matrix = R_centered_del @ inv_cov @ R_centered_del.T
+    cov_i_given_rest_test2 = np.sum(Ri * Ri) - np.sum(Ri * (first_matrix @ Ri)) + lbd
+    one = (R_centered_del @ R_centered_del.T @ Ri) * (inv_kernel @ Ri)
+    second_matrix = R_centered_del @ R_centered_del.T @ inv_kernel
+    #print("first matrix \n", first_matrix)
+    #print("second matrix \n", second_matrix)
+    cov_i_given_rest_test3 = np.sum(Ri * Ri) - np.sum(Ri * (second_matrix @ Ri)) + lbd
+    cov_i_given_rest_test4 = Cov[idx, idx] - np.sum(one)
+    #print("cov i given rest ", cov_i_given_rest)
+    print("utils cov i give test ", cov_i_given_rest_test)
+    print("cov i given rest test2", cov_i_given_rest_test2)
+    print("cov i given rest test3", cov_i_given_rest_test3)
+    print("cov i given rest test4", cov_i_given_rest_test4)
+    return cov_i_given_rest_test, cov_i_given_rest_test2, cov_i_given_rest_test3, cov_i_given_rest_test4
+
