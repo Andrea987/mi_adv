@@ -899,7 +899,8 @@ def gibb_sampl_over_parametrized_sampling(info):
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
-            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=True)
+            print("i: ", i)
+            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K_centered_reg, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=True)
             #print("round ", i, ": imputed matrix gs overp\n", X)
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
@@ -1002,13 +1003,13 @@ def test_gibb_sampl_over_parametrized_sampling():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
     print("test gibb sampl under parametr started")
-    n = 3
+    n = 6
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 5
+    d = 9
     gaussian = True
-    lbd = 0.98765 + 0.0
+    lbd = 10.98765 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
