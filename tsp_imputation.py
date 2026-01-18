@@ -264,7 +264,9 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
 
 
 def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling):#XX, mu, S, Q, M, i):
-    # K: kernel matrix
+    # K: kernel matrix centered and regulirized
+    # K_inv: inverse of K
+    # lbd: regulirizer
     # idx: current imputed index
     # m: current_mask
     n_m = np.sum(m)  #  nbr missing, M_ij = 1 iff component is missing
@@ -281,7 +283,8 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
     #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
     if A.ndim == 1:
         A = np.array([A])
-    if n_m < n_s:  # not many missing components 
+    if n_m < n_s * 1000:  # not many missing components 
+        print("less miss components that seen")
         #print("n_m < n_s")
         #print("M \n", M)
         #X_del = np.delete(X, idx, axis=1)
@@ -298,7 +301,30 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         #print("A\n", A)
         
         #print("X_s ", X_s)
-        x = -np.linalg.solve(S_C, A @ X_s)
+        mean_idx = np.mean(X_s) 
+        print(mean_idx)
+        #x = mean_idx - np.linalg.solve(S_C, A @ (X_s - mean_idx))
+        x = mean_idx - np.linalg.solve(S_C, A @ (X_s - mean_idx))  #
+        print("predicitons ", x)  
+        R = X[m==0, :]
+        mean = np.mean(R, axis=0)
+        uuu = np.ones(R.shape[0])
+        R_centered = R - np.outer(uuu, mean)
+        Cov = R_centered.T @ R_centered + lbd * np.eye(d)
+        Q = np.linalg.inv(Cov)
+        X_i = np.delete(X, idx, axis=1)
+        Q_i = np.delete(Q, idx, axis=0)
+        v = np.zeros(d-1)
+        v = -(1 / Q[idx, idx]) * Q_i[:, idx]
+        prediction1 = X_i @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
+        print("prediction 1 ", prediction1)
+
+        # TO DO: FIND BECUASE THE TWO PREDICTIONS ARE DIFFERENT
+
+        # as a test you can compute the conditional mean in the standard way
+
+        #print("who is x in impute overparameterized sampling ", -x)
+        #print("who is x in impute overparameterized sampling ", x.shape)
         #print("x\n ", x)
         #print("check ", np.sqrt( np.sum( (S_C @ x - A@X_s)**2) ) )
         #print("M \n ", M[:, idx])
@@ -316,7 +342,7 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         partial = w - Xs.T @ np.linalg.solve(K_S, Xs @ w ) 
         x = Xm @ partial + lbd * v
         x = - x
-    if sampling:
+    if sampling and n_m>0:
         print("K\n ", K)  # K is the regularize centered kernel matrix
         K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
         Xss = X_s - np.mean(X_s)
@@ -324,13 +350,14 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         print("Xss ", Xss)
         x1 = np.linalg.solve(K_S, Xss)
         K_S_not_reg = K_S - np.eye(n_s) * lbd
-        cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1))) + lbd
-        print("my cov ", cov_i_given_rest)
+        cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
+        print("my cov   ", cov_i_given_rest)
         cov_test, _, _, _ = compute_stats(X, m, lbd, idx)
-        input()
+        print("test cov ", cov_test / n_s)
+        #input()
         prediction = x
-        sample = np.random.multivariate_normal(mean = prediction, 
-                                           cov = cov_i_given_rest * np.eye(n_s))
+        print("predictions ", prediction)
+        sample = np.random.multivariate_normal(mean = prediction, cov = cov_i_given_rest * np.eye(n_m))
         x = sample
     X[m == 1, idx] = x
     return X
