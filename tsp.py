@@ -1032,11 +1032,11 @@ def test_gibb_sampl_over_parametrized_sampling():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
     print("test gibb sampl under parametr started")
-    n = 4
+    n = 9
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 9
+    d = 15
     gaussian = True
     lbd = 5.98765 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
