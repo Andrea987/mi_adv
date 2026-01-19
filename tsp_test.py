@@ -3,7 +3,7 @@ import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
-from tsp import gibb_sampl_over_parametrized_sampling
+from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
 from utils import make_centered_kernel_matrix, update_inverse_rk2_sym
 from sklearn.experimental import enable_iterative_imputer
@@ -442,7 +442,7 @@ def test_gibb_sampling_over_parametrized_sampling():
     ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=True, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     res_skl = ice_skl.fit_transform(X_nan)
     np.testing.assert_allclose(res, res_skl)
-    print("check skl vs my under parametrized passed successfully")
+    print("check skl vs my over parametrized passed successfully")
 
     info_dic['intercept'] = False
     #print(info_dic)
@@ -451,11 +451,83 @@ def test_gibb_sampling_over_parametrized_sampling():
     ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     res_skl1 = ice_skl.fit_transform(X_nan)
     np.testing.assert_allclose(res1, res_skl1)
-    print("check skl_1 vs my under parametrized_1 passed successfully")
+    print("check skl_1 vs my over parametrized_1 passed successfully")
     print("test gibb sample over parametr ended successfully")
 
 
-test_gibb_sampling_over_parametrized_sampling()
+def test_gibb_sampl_under_parametrized_sampling():
+    # no sampling, check against ridge regression with intercept
+    print("test gibb sampling udnerparametrized_sampling began")
+    n, d = 100, 4
+    lbd = 4.321096 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    #X_orig = np.random.rand(n, d) + 0.0
+    #print(X_orig.dtype)
+    #print("max min ")
+    #mean = np.mean(X_orig, axis=0)
+    #std = np.std(X_orig, axis=0)
+    # Standardize
+    #X = (X_orig - mean) / std
+    X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    M = np.random.binomial(1, 0.4, size=(n, d))
+    for ii in range(d):
+        nbr = np.random.randint(0, n)
+        #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
+        if np.sum(M[:, ii]) == n:
+            print("add a random seen component")
+            M[nbr, ii] = 0
+    print(M)
+    #input()
+    #M[-1, 0] = 0
+    #print("exponent", exponent)
+    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    #print(X_nan)
+    R = 3
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'batch_size': 64,
+        'verbose': 0,
+        'initial_strategy': 'constant',
+        'exponent_d': 0.75,
+        'sampling': False,
+        'intercept': True
+    }
+    res = gibb_sampl_under_parametrized_sampling(info_dic)
+    #res_std = gibb_sampl(info_dic)
+    #print("final res_std\n", res_std)
+    #print("final res\n", res)
+    #np.testing.assert_allclose(res, res_std)
+
+    print("It imputer Ridge Reg")
+    ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=True, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
+    res_skl = ice_skl.fit_transform(X_nan)
+    print("res\n", res)
+    print("res sskl\n", res_skl)
+    np.testing.assert_allclose(res, res_skl)
+    print("check skl vs my under parametrized passed successfully\n\n NEW TRIAL, NO INTERCEPT")
+
+    info_dic['intercept'] = False
+    #print(info_dic)
+    res1 = gibb_sampl_under_parametrized_sampling(info_dic)
+    print("It imputer Ridge Reg no intercept under parametrized")
+    ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
+    res_skl1 = ice_skl.fit_transform(X_nan)
+    np.testing.assert_allclose(res1, res_skl1)
+    print("check skl_1 vs my under parametrized_1 passed successfully")
+    print("test gibb sample under parametr ended successfully")
+
+
+test_gibb_sampl_under_parametrized_sampling()
+
 
 input()
 
@@ -469,4 +541,5 @@ test_impute_matrix_under_parametrized()
 test_gibb_sampl_no_modification()
 test_gibb_sampl_under_parametrized()
 test_gibb_sampl_over_parametrized()
+test_gibb_sampling_over_parametrized_sampling()
 

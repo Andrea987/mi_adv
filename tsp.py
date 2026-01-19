@@ -420,10 +420,10 @@ def gibb_sampl_under_parametrized_sampling_max_likelihood(info):
         #diff = np.sum((X - old_X)**2)
         stat, pvalue = Energy().test(original_X, old_X)
         print("stat ", stat , "p value ", pvalue)
-        aa, bb = np.ones((n,)) / n, np.ones((n,)) / n
-        MM = ot.dist(original_X, old_X)
-        G0 = ot.sinkhorn2(aa, bb, MM, 0.1)
-        print("G0 ", G0)
+        #aa, bb = np.ones((n,)) / n, np.ones((n,)) / n
+        #MM = ot.dist(original_X, old_X)
+        #G0 = ot.sinkhorn2(aa, bb, MM, 0.1)
+        #print("G0 ", G0)
         input()
         #print("\ndifference old vs new \n", np.sqrt(diff))
         if X.shape[1] == 2:
@@ -550,12 +550,15 @@ def gibb_sampl_under_parametrized_sampling_max_likelihood(info):
 
 def gibb_sampl_under_parametrized_sampling(info):
     # flip matrix
-    if info['ml_or_bs'] not in ['bayesian', 'max_lh']:
-        print("please specify a correct approach, bayesian or max_lh")
-        input()
+    #if info['ml_or_bs'] not in ['bayesian', 'max_lh']:
+    #    print("please specify a correct approach, bayesian or max_lh")
+    #    input()
     X = info['data']
     original_X = X
     M = info['masks']
+    sampling = info['sampling'] if 'sampling' in info else False
+    intercept = info['intercept'] if 'intercept' in info else True
+    print(M)
     if original_X.shape[1] == 2:
         plt.scatter(original_X[:, 0], original_X[:, 1])
         plt.scatter(original_X[M[:, 0] == 1, 0], original_X[M[:, 0] == 1, 1])
@@ -617,14 +620,14 @@ def gibb_sampl_under_parametrized_sampling(info):
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
     start_gibb_s = time.time()
-    mean = np.mean(R, axis=0)
+    mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1])
     u = np.ones(R.shape[0])
     #print(a)
     #print("\n", np.outer(u, a))
     R_centered = R - np.outer(u, mean)
-    alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1/R_centered.shape[0] 
-    print("alpha ", alpha)
-    Cov = R_centered.T @ R_centered * alpha + lbd * np.eye(d)  ## look how to add the (1/n), where it is better to be added 
+    #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1/R_centered.shape[0] 
+    #print("alpha ", alpha)
+    Cov = R_centered.T @ R_centered + lbd * np.eye(d)  ## look how to add the (1/n), where it is better to be added 
     Q = np.linalg.inv(Cov)
     current_info ={
         'inverse': Q,
@@ -654,9 +657,9 @@ def gibb_sampl_under_parametrized_sampling(info):
             plt.scatter(X[M[:, 1] == 1, 0], X[M[:, 1] == 1, 1])
             plt.show()
         for i in range(d):
-            alpha = R_centered.shape[0] if info['ml_or_bs'] == 'bayesian' else 1
-            #print("alpha.  ", alpha)
-            X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i)
+            #alpha = R_centered.shape[0] if info['ml_or_bs'] == 'bayesian' else 1
+            alpha = R_centered.shape[0]  # we need to correct by this alpha to get a correct imputation
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i, sampling, intercept)
             #print("stopppp")
             #input()
             #print("round ", i, "who is X gs\n", X)
@@ -701,20 +704,20 @@ def gibb_sampl_under_parametrized_sampling(info):
                 R = X[M[:, idx] == 0, :]  # seen components, not centered
                 ns = R.shape[0]
                 #print("ns true ", R.shape[0])
-                old_mean = mean
-                mean = np.mean(R, axis=0)  # new mean
+                old_mean = mean #if intercept else np.zeros(R.shape[1])
+                mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1]) # new mean
                 old_R_centered = R_centered
                 u = np.ones(R.shape[0])
                 R_centered = R - np.outer(u, mean)
                 if ns < nup + ndw:  # if nbr seen component is less than nbr of flips
-                    #print("recompute the matrix with the missing components")
+                    print("recompute the matrix with the missing components")
                     counter_recomputation = counter_recomputation + 1
                     #mean = np.mean(R, axis=0)
                     u = np.ones(R.shape[0])
                     #print(a)
                     #print("\n", np.outer(u, a))
-                    alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1 / R_centered.shape[0]
-                    Cov = R_centered.T @ R_centered * alpha + lbd * np.eye(d)
+                    #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1 / R_centered.shape[0]
+                    Cov = R_centered.T @ R_centered + lbd * np.eye(d)
                     #Rt_R = R.T @ R + lbd * np.eye(d)
                     #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
                 else:
@@ -723,58 +726,12 @@ def gibb_sampl_under_parametrized_sampling(info):
                     #old_mean = mea
                     #mean = np.mean(R, axis=0)
                     old_Cov = Cov
-                    
-                    #Cov = update_covariance(Cov * old_R_centered.shape[0], old_R, R, old_mean, mean, X_up, X_dw)
-                    if info['ml_or_bs'] == 'bayesian':
-                        #Cov1 = Cov + np.outer(old_mean, old_mean) * ns_old
-                        #Cov1_test = old_R.T @ old_R + lbd * np.eye(d) 
-                        #print("Cov1, \n", Cov1)
-                        #print("Cov1 test \n", Cov1_test)
-
-                        #Cov2 = Cov1 + X_up.T @ X_up - X_dw.T @ X_dw
-                        #Cov2_test = R.T @ R + lbd * np.eye(d)
-                        #print("Cov2, \n", Cov2)
-                        #print("Cov2 test \n", Cov2_test)
-                        
-                        Cov = Cov + np.outer(old_mean, old_mean) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw - np.outer(mean, mean) * ns
-                        Cov_test = R_centered.T @ R_centered + lbd * np.eye(d)
-                        #print("test Cov_test vs Cov")
-                        np.testing.assert_allclose(Cov_test, Cov)
-                        #print("Cov, \n", Cov)
-                        #print("Cov test \n", Cov_test)
-                        #input()
-                    else:  # max-likelihood approach
-                        #Cov = update_covariance((Cov - lbd * np.eye(d)) * old_R_centered.shape[0], old_R, R, old_mean, mean, X_up, X_dw) * (1/R_centered.shape[0]) + lbd * np.eye(d)
-                        Cov = ((Cov - lbd * np.eye(d) + np.outer(old_mean, old_mean)) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw) / ns - np.outer(mean, mean) + lbd * np.eye(d)
-                        Cov_test = R_centered.T @ R_centered / ns + lbd * np.eye(d)
-                        np.testing.assert_allclose(Cov_test, Cov)
-                        #print("Cov, \n", Cov)
-                        #print("Cov test \n", Cov_test)
-                        #input()
-                        
-                        #P1 = ((old_Cov - lbd * np.eye(d)) * old_R_centered.shape[0] - s_prod(old_R, old_mean)) 
-                        #P2 = old_R.T @ old_R
-                        #print("P1 \n", P1)
-                        #print("P2 \n", P2)
-
-                        #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
-                        #RR = X[M[:, idx] == 0, :]
-                        #mean = np.mean(RR, axis=0)
-                        #u = np.ones(RR.shape[0])
-                        #print(a)
-                        #print("\n", np.outer(u, a))
-                        #RR = RR - np.outer(u, mean)
-                        #print("RR\n", RR)
-                        #print("R centered ", R_centered)
-                        #RRt_RR = RR.T @ RR * (1/RR.shape[0]) + lbd * np.eye(d)
-                        #Rt_RR = RR.T @ RR + lbd * np.eye(d)
-                        #print("error? \n")
-                        #print("index ", idx, "\n")
-                        #np.testing.assert_allclose(Cov, RRt_RR)
-                        #print("testing passed")
-                        #input()
-                if nup + ndw > d ** info['exponent_d']:
-                    #print("invert the matrix")
+                    Cov = Cov + np.outer(old_mean, old_mean) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw - np.outer(mean, mean) * ns
+                    Cov_test = R_centered.T @ R_centered + lbd * np.eye(d)
+                    #np.testing.assert_allclose(Cov_test, Cov)
+                    #Cov = ((Cov - lbd * np.eye(d) + np.outer(old_mean, old_mean)) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw) / ns - np.outer(mean, mean) + lbd * np.eye(d)
+                if  nup + ndw > d ** info['exponent_d']:
+                    print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
                     #print(idx)
@@ -786,30 +743,30 @@ def gibb_sampl_under_parametrized_sampling(info):
                     Q = np.linalg.inv(Cov)
                 else:
                     counter_swm_formula = counter_swm_formula + 1
-                    #print("low rank upd of the inverse")
+                    print("low rank upd of the inverse")
                     #print("approach: ", info['ml_or_bs'])
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1 / R_centered.shape[0]
-                    old_mean_rescaled = np.sqrt(ns_old) * old_mean if info['ml_or_bs'] == 'bayesian' else old_mean 
-                    mean_rescaled = np.sqrt(ns) * mean if info['ml_or_bs'] == 'bayesian' else mean
+                    old_mean_rescaled = np.sqrt(ns_old) * old_mean #if info['ml_or_bs'] == 'bayesian' else old_mean 
+                    mean_rescaled = np.sqrt(ns) * mean #if info['ml_or_bs'] == 'bayesian' else mean
                     #old_mean_rescaled = np.sqrt(ns_old) * old_mean 
                     #mean_rescaled = np.sqrt(ns) * mean
                     X_up_ext = np.vstack((X_up, old_mean_rescaled))
                     X_dw_ext = np.vstack((X_dw, mean_rescaled))
 
-                    QQ = swm_formula(Q, old_mean_rescaled, 1.0)
-                    QQ_test = np.linalg.inv(old_R.T @ old_R + np.eye(d) * lbd)
+                    #QQ = swm_formula(Q, old_mean_rescaled, 1.0)
+                    #QQ_test = np.linalg.inv(old_R.T @ old_R + np.eye(d) * lbd)
                     #print("QQ_inv\n ", QQ)
                     #print("QQ_test_inv \n", QQ_test)
 
-                    QQQ = swm_formula(QQ, X_up.T, 1.0)
-                    QQQ = swm_formula(QQQ, X_dw.T, -1.0) 
-                    QQQ_test = np.linalg.inv(R.T @ R + np.eye(d) * lbd)
+                    #QQQ = swm_formula(QQ, X_up.T, 1.0)
+                    #QQQ = swm_formula(QQQ, X_dw.T, -1.0) 
+                    #QQQ_test = np.linalg.inv(R.T @ R + np.eye(d) * lbd)
                     #print("QQQ_inv\n ", QQQ)
                     #print("QQQ_test_inv\n ", QQQ_test)
 
-                    QQQQ = swm_formula(QQQ, mean_rescaled, -1.0)
-                    QQQQ_test = np.linalg.inv(R_centered.T @ R_centered + np.eye(d) * lbd)
+                    #QQQQ = swm_formula(QQQ, mean_rescaled, -1.0)
+                    #QQQQ_test = np.linalg.inv(R_centered.T @ R_centered + np.eye(d) * lbd)
                     #print("\n\nQQQQ_inv\n ", QQQQ)
                     #print("QQQQ_test_inv \n", QQQQ_test)
 
@@ -817,8 +774,6 @@ def gibb_sampl_under_parametrized_sampling(info):
                     Q = swm_formula(Q, X_up_ext.T, 1.0)
                     Q = swm_formula(Q, X_dw_ext.T, -1.0)
                     #Q_test = np.linalg.inv(Cov)
-
-                    
 
                     #print("Q_inv\n ", Q)
                     #print("Q_test_inv \n", Q_test)
@@ -839,7 +794,6 @@ def gibb_sampl_under_parametrized_sampling(info):
     #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
-
 
 
 def gibb_sampl_over_parametrized_sampling(info):
@@ -911,6 +865,9 @@ def gibb_sampl_over_parametrized_sampling(info):
                     #np.testing.assert_allclose(KKK_inv, K_centered_reg_inv)
                 #input()
     return X
+
+
+
 
 
 
@@ -1075,18 +1032,5 @@ def test_gibb_sampl_over_parametrized_sampling():
     #ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     #start4 = time.time()   # tic
     #res4 = ice4.fit_transform(X_nan)
-
-
-#    print("result IterativeImptuer with Ridge\n", res4)
-    #end4 = time.time()     # toc
-    #print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-    #if not info_dic['tsp']:
-    #np.testing.assert_allclose(X_my, res4)
-    #print("test gibb sampl under parametr ended successfully\n")
-
-
-
-#test_gibb_sampl_under_parametrized_sampling()
-#test_gibb_sampl_over_parametrized_sampling()
 
 

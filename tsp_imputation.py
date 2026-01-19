@@ -194,7 +194,7 @@ def impute_matrix_under_parametrized_sampling_max_likelihood(XX, mu, S, Q, M, i)
 '''
 
 
-def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
+def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, intercept):
     # XX input matrix
     # mu current mean
     # S current covariance matrix
@@ -212,53 +212,17 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
     v = np.zeros(d-1)
     v = -(1 / Q[i, i]) * Q_i[:, i]
 
-    check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
-    #print("v       ", v)
-    #print("check_v ", check_v)
-
-    S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
+    #check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
+    #S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
     S_current = 1 / Q[i, i]
-    #if ml_or_bs == 'bayes':
-    #    S_current = v / np.sum(M[:, i])  # the conditional variance is rescaled by the number of seen components  
-    #print("S_current      ", S_current)
-    #print("S_current check", S_current_check)
-
-    #if i == 0:
-    #    v = -(1/Q[0, 0]) * Q[1:, 0]
-    #elif i== d:
-    #    v = -(1/Q[d, d]) * Q[0:d-1, 0]
-    #else:
-    #    v[0:i] = Q[0:i, 0]
-    #    v[(i+1):d] = Q[(i+1):d, 0]
-    #    v = -(1/Q[i, i]) * v
     u = np.ones(n)
     prediction = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
 
     prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
-    #print(prediction.shape)
-    #print("S_current ", S_current)
+    
+    sample = np.random.multivariate_normal(mean = prediction, cov = S_current * np.eye(n)) if sampling else prediction
 
-    sample = np.random.multivariate_normal(mean = prediction, 
-                                           cov = S_current * np.eye(n))
-
-    #vvv = -30 * (vv < 4).astype(int) + 18 * (vv >= 6).astype(int) + vv * ((vv >= 4) & (vv < 6)).astype(int) 
-    #thr = 1.8
-    #prediction = -thr * (prediction < -thr).astype(int) + thr * (prediction >= thr).astype(int) + prediction * ((prediction >= -thr) & (prediction < thr)).astype(int) 
-    #print(v[:, None])
-    #print("test in impute matrix, who is v\n ", v)
-    #print(-Q * (1 / Q[i, i]))
-    #print(prediction, prediction.shape)
-    #print(prediction.squeeze())
-    #print(X[:, i])
-    #print(M[:, i])
-    #print(X[:, i] * (1 - M[:, i]))
-    #print(prediction * M[:, i])
-    # print(X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i])
-    # print(X[:, i])
     X[:, i] = X[:, i] * (1 - M[:, i]) + sample.squeeze() * M[:, i] + 0.0
-    #X[:, i] = X[:, i] * (1 - M[:, i]) + prediction.squeeze() * M[:, i]
-    #X[:, i] = np.zeros_like(X[:, i])
-    #print("new X\n", X)
     return X, v  # imputed matrix, coeff
 
 
