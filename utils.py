@@ -210,7 +210,9 @@ def make_centered_kernel_matrix(K, m):
     # where mu is (X @ (1-m)) / np.sum(1-m) is the mean of a
     # subsample of X
     # m is a mask, such that m[i] = 0 iff component is seen, 0 otherwise
-    ms = (1 - m) / np.sum(1 - m)
+    ns = np.sum(1-m)
+    ms = (1 - m) / ns if ns>0 else np.zeros_like(m)
+    #print("ms ", ms)
     u = np.ones(K.shape[0])
     w = K @ ms
     sw = np.outer(w, u) + np.outer(u, w)
@@ -256,4 +258,56 @@ def compute_stats(X, m, lbd, idx):
     print("cov i given rest test3", cov_i_given_rest_test3)
     print("cov i given rest test4", cov_i_given_rest_test4)
     return cov_i_given_rest_test, cov_i_given_rest_test2, cov_i_given_rest_test3, cov_i_given_rest_test4
+
+
+def compute_stats_mean(X, m, lbd, idx, intercept):
+    # test function that compute some means in different ways
+    n, d = X.shape
+    R = X[m==0, :]
+    mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1])
+    mean_i = np.delete(mean, idx, 0)
+    uuu = np.ones(R.shape[0])
+    R_centered = R - np.outer(uuu, mean)
+    Cov = R_centered.T @ R_centered + lbd * np.eye(d)
+    #print(Cov)
+    Cov_i = np.delete(Cov, idx, axis=0)
+    Cov_ii = np.delete(Cov_i, idx, axis=1)
+    #print(Cov_i[:, idx])
+    Q = np.linalg.inv(Cov)
+    X_i = np.delete(X, idx, axis=1)
+    Q_i = np.delete(Q, idx, axis=0)
+    Q_ii = np.delete(Q_i, idx, axis=1)
+    v = -(1 / Q[idx, idx]) * Q_i[:, idx]
+    vv = np.linalg.inv(Cov_ii) @ Cov_i[:, idx] #np.linalg.solve(Q_ii, Cov_i)
+    #print("v  ", v, "\nvv ", vv)
+    np.testing.assert_allclose(vv, v)
+    uuuu = np.ones(X.shape[0])
+    prediction1 = mean[idx] + (X_i - np.outer(uuuu, mean_i)) @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
+    nm = np.sum(m)
+    uuuuu = np.ones(nm)
+    prediction1 = mean[idx] + (X_i[m == 1, :] - np.outer(uuuuu, mean_i)) @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
+    return prediction1
+
+
+
+
+def compute_centered_kernel_matrix_regulirized_manually(K, m, lbd, intercept):
+    # just a test function which computes the kernel matrix, manually
+    n = K.shape[0]
+    u = np.ones(n)
+    ns = np.sum(1-m)
+    ms = (1 - m) / ns if intercept else np.zeros_like(m)
+    #ms = (1 - current_mask) / np.sum(1 - current_mask)  # ms[i] = 1 iff component is seen
+    A = np.eye(n) - np.outer(u, ms)
+    return A @ K @ A.T + np.eye(n) * lbd
+
+
+def compute_centered_kernel_matrix_regulirized_manually_2(X, m, lbd, intercept):
+    n, d = X.shape  # suppose n < d
+    R = X[m == 0, :]
+    mean = np.mean(R, axis=0) if intercept else 0
+    u = np.ones(X.shape[0])
+    X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
+    return X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
+
 

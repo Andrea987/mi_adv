@@ -94,13 +94,13 @@ def test_s():
     C = np.random.randint(0, 5, (n, d)) + 0.0
     v = np.random.randint(0, 5, d) + 0.0
     u = np.ones(n)
-    print(C)
+    #print(C)
     CC = C - np.outer(u, v)
-    print(v)
-    print(CC)
+    #print(v)
+    #print(CC)
     S = CC.T @ CC 
     S_test = C.T @ C + s(C, v)
-    print(S_test)
+    #print(S_test)
     np.testing.assert_allclose(S, S_test)
     print("test_s ended successfully")
 
@@ -389,8 +389,8 @@ def test_gibb_sampl_over_parametrized():
 def test_gibb_sampling_over_parametrized_sampling():
     # no sampling, check against ridge regression with intercept
     print("test gibb sampling overparametrized began")
-    n, d = 10, 15
-    lbd = 2.321096 + 0.0
+    n, d = 6, 10
+    lbd = 1.321096 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     #print(X_orig.dtype)
@@ -417,7 +417,7 @@ def test_gibb_sampling_over_parametrized_sampling():
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     #print(X_nan)
-    R = 3
+    R = 2
     info_dic = {
         'data': X,
         'masks': M,
@@ -429,7 +429,8 @@ def test_gibb_sampling_over_parametrized_sampling():
         'verbose': 0,
         'initial_strategy': 'mean',
         'exponent_d': 0.75,
-        'sampling': False
+        'sampling': False,
+        'intercept': True
     }
     res = gibb_sampl_over_parametrized_sampling(info_dic)
     #res_std = gibb_sampl(info_dic)
@@ -442,7 +443,17 @@ def test_gibb_sampling_over_parametrized_sampling():
     res_skl = ice_skl.fit_transform(X_nan)
     np.testing.assert_allclose(res, res_skl)
     print("check skl vs my under parametrized passed successfully")
+
+    info_dic['intercept'] = False
+    #print(info_dic)
+    res1 = gibb_sampl_over_parametrized_sampling(info_dic)
+    print("It imputer Ridge Reg no intercept")
+    ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
+    res_skl1 = ice_skl.fit_transform(X_nan)
+    np.testing.assert_allclose(res1, res_skl1)
+    print("check skl_1 vs my under parametrized_1 passed successfully")
     print("test gibb sample over parametr ended successfully")
+
 
 test_gibb_sampling_over_parametrized_sampling()
 

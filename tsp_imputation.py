@@ -1,5 +1,5 @@
 import numpy as np
-from utils import compute_stats
+from utils import compute_stats, compute_stats_mean
 
 
 
@@ -263,7 +263,7 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i):
 
 
 
-def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling):#XX, mu, S, Q, M, i):
+def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling, intercept):#XX, mu, S, Q, M, i):
     # K: kernel matrix centered and regulirized
     # K_inv: inverse of K
     # lbd: regulirizer
@@ -273,22 +273,14 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
     n_s = np.sum(1-m)
     _, d = X.shape
 
-    #print("K\n", K)
-    #print("K_inv\n", K_inv)
-    #print("nplinalg.inv(K)\n", np.linalg.inv(K))
-
+    cov_i_given_rest = None
     X_idx = X[:, idx]
     X_s = X_idx[m == 0]  # (n_s,)
+    mean_idx = np.mean(X_s) if intercept else 0
     K_inv_MS = K_inv[m == 1][:, m == 0]  # (n_m, n_s)
-    #print("dim A ", A.shape, ", nbr miss ", n_m, "nbr seen ", n_s) 
-    #K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
-    #Xss = X_s - np.mean(X_s)
-    #x1 = np.linalg.solve(K_S, Xss)
-    #K_S_not_reg = K_S - np.eye(n_s) * lbd
-    #mean_i_given_rest = np.mean(X_s) + A @ x1
     if K_inv_MS.ndim == 1:
         K_inv_MS = np.array([K_inv_MS])
-    if n_m < n_s * 1000:  # not many missing components 
+    if n_m * 10000000 < n_s:  # not many missing components 
         print("less miss components that seen")
         #print("n_m < n_s")
         #print("M \n", M)
@@ -307,84 +299,50 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         #print("A\n", A)
         
         #print("X_s ", X_s)
-        mean_idx = np.mean(X_s) 
         print(mean_idx)
-        #x = mean_idx - np.linalg.solve(S_C, A @ (X_s - mean_idx))
+        #x = mean_idx - np.linalg.solve(S_C, A @ (X_s - mean_idx)) 
         x = mean_idx - np.linalg.solve(K_inv_MM, K_inv_MS @ (X_s - mean_idx))  #
         print("predicitons ", x)  
 
-        K_SS = K[m == 0, :][:, m == 0]  # submatrix of regulirized seen components
-        K_MS = K[m == 1, :][:, m == 0]
-        Xss = X_s - np.mean(X_s)
-        x1 = np.linalg.solve(K_SS, Xss)
-        K_S_not_reg = K_SS - np.eye(n_s) * lbd
-        mean_i_given_rest = np.mean(X_s) + K_MS @ x1
+        #K_SS = K[m == 0, :][:, m == 0]  # submatrix of regulirized seen components
+        #K_MS = K[m == 1, :][:, m == 0]
+        #Xss = X_s - mean_idx
+        #x1 = np.linalg.solve(K_SS, Xss)
+        #K_S_not_reg = K_SS - np.eye(n_s) * lbd
+        #mean_i_given_rest = mean_idx + K_MS @ x1
         
-        print("mean i given rest ", mean_i_given_rest)
-
-
-        R = X[m==0, :]
-        mean = np.mean(R, axis=0)
-        mean_i = np.delete(mean, idx, 0)
-        print("mean[idx] ", mean[idx], "np.mean(X_s) ", np.mean(X_s))
-        uuu = np.ones(R.shape[0])
-        R_centered = R - np.outer(uuu, mean)
-        Cov = R_centered.T @ R_centered + lbd * np.eye(d)
-        #print(Cov)
-        Cov_i = np.delete(Cov, idx, axis=0)
-        Cov_ii = np.delete(Cov_i, idx, axis=1)
-        #print(Cov_i[:, idx])
-        Q = np.linalg.inv(Cov)
-        X_i = np.delete(X, idx, axis=1)
-        Q_i = np.delete(Q, idx, axis=0)
-        Q_ii = np.delete(Q_i, idx, axis=1)
-        v = -(1 / Q[idx, idx]) * Q_i[:, idx]
-        vv = np.linalg.inv(Cov_ii) @ Cov_i[:, idx] #np.linalg.solve(Q_ii, Cov_i)
-        #print("v  ", v, "\nvv ", vv)
-        uuuu = np.ones(X.shape[0])
-        prediction1 = mean[idx] + (X_i - np.outer(uuuu, mean_i)) @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
-        #print("prediction 1 ", prediction1)
-
-
-        # TO DO: FIND THE REASON THE TWO PREDICTIONS ARE DIFFERENT
-
-        # as a test you can compute the conditional mean in the standard way
-
-        #print("who is x in impute overparameterized sampling ", -x)
-        #print("who is x in impute overparameterized sampling ", x.shape)
-        #print("x\n ", x)
-        #print("check ", np.sqrt( np.sum( (S_C @ x - A@X_s)**2) ) )
-        #print("M \n ", M[:, idx])
-        #X[M[:, idx] == 1, idx] = -x
+        #print("mean i given rest ", mean_i_given_rest)
+        #prediction1 = compute_stats_mean(X, m, lbd, idx, intercept)
+        #print("prediction 1", prediction1)
+        #np.testing.assert_allclose(x, mean_i_given_rest)
+        #np.testing.assert_allclose(x, prediction1.squeeze())
     else:  # many missing components, it's better to work with the the submatrix of seen components
         #print("n_s < n_m")
-        K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
-        #print("K_S\n", K_S)
-        v = A @ X_s  # (n_m, n_s) * (n_s,) = (n_m,) 
-        X_del = np.delete(X, idx, axis=1)
-        Xm = X_del[m == 1, :]  # (n_m, d-1) 
-        Xs = X_del[m == 0, :]  # (n_s, d-1)
-        #print("Xs @ Xs.T + lbd * Id\n", Xs @ Xs.T + lbd * np.eye(n_s))
-        w = Xm.T @ v  # (d-1, n_m) * (n_m,) = (d-1,)
-        partial = w - Xs.T @ np.linalg.solve(K_S, Xs @ w ) 
-        x = Xm @ partial + lbd * v
-        x = - x
+        K_SS = K[m == 0, :][:, m == 0]  # submatrix of regulirized seen components
+        K_MS = K[m == 1, :][:, m == 0]
+        Xss = X_s - mean_idx
+        x1 = np.linalg.solve(K_SS, Xss)
+        K_S_not_reg = K_SS - np.eye(n_s) * lbd
+        mean_i_given_rest = mean_idx + K_MS @ x1
+        cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
+        x = mean_i_given_rest
+        #prediction1 = compute_stats_mean(X, m, lbd, idx, intercept)
+        #print("prediction 1", prediction1)
+        #np.testing.assert_allclose(x, mean_i_given_rest)
+        #np.testing.assert_allclose(x, prediction1.squeeze())
+
     if sampling and n_m>0:
         print("you are sampling")
         #print("K\n ", K)  # K is the regularize centered kernel matrix
-        K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
-        Xss = X_s - np.mean(X_s)
-        print("test variacen ", np.sum(Xss * Xss))
-        #print("Xss ", Xss)
-        x1 = np.linalg.solve(K_S, Xss)
-        K_S_not_reg = K_S - np.eye(n_s) * lbd
-        cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
-        #print("my cov   ", cov_i_given_rest)
-        cov_test, _, _, _ = compute_stats(X, m, lbd, idx)
-        #print("test cov ", cov_test / n_s)
-        #input()
+        if cov_i_given_rest is None:
+            K_SS = K[m == 0, :][:, m == 0]  # submatrix of seen components
+            Xss = X_s - mean_idx
+            print("test variacen ", np.sum(Xss * Xss))
+            #print("Xss ", Xss)
+            x1 = np.linalg.solve(K_SS, Xss)
+            K_S_not_reg = K_SS - np.eye(n_s) * lbd
+            cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
         prediction = x
-        #print("predictions ", prediction)
         sample = np.random.multivariate_normal(mean = prediction, cov = cov_i_given_rest * np.eye(n_m))
         x = sample
     X[m == 1, idx] = x

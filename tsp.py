@@ -17,7 +17,7 @@ from tsp_imputation import impute_matrix_overparametrized, impute_matrix_under_p
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_over_parametrized_sampling
 from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, swm_formula, split_upd, split_up_fx_dw, update_covariance
 from utils import s as s_prod
-from utils import make_centered_kernel_matrix
+from utils import make_centered_kernel_matrix, compute_centered_kernel_matrix_regulirized_manually, compute_centered_kernel_matrix_regulirized_manually_2
 from serialization import serialization_first_idea
 import copy
 from hyppo.ksample import Energy
@@ -846,63 +846,28 @@ def gibb_sampl_over_parametrized_sampling(info):
     ## Gibb sampling in an overparametrized setting
     X = info['data']
     M = info['masks']
-    sampling = info['sampling'] if 'sampling' in info else True
-    #M[1, 1] = 1
+    u = np.ones(X.shape[0])
+    M_original = M.copy()
+    sampling = info['sampling'] if 'sampling' in info else False
+    intercept = info['intercept'] if 'intercept' in info else True
+    print("\nintercept: ", intercept, "\n\n")
     X_nan = X.copy()
     original_X = X.copy()
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
-    #print("simple imputer in gibb sample overparametrized \n", X)
-    #print("shape M", M.shape)
-    #print("nbr masks ", np.sum(M, axis=0).shape)
-    #print("nbr masks ", np.sum(M, axis=0))
     nbr_it_gs = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape  # suppose n < d
-    R = X[M[:, 0] == 0, :]
-    print("R \n", R)
-    #print("first set vct ", R)
-    #print("first set vct shape ", R.shape)
-    start_gibb_s = time.time()
-    mean = np.mean(R, axis=0)
-    ms = (1 - M[:, 0]) / np.sum(1 - M[:, 0])
-    print(ms)
-    u = np.ones(X.shape[0])
-    A = np.eye(n) - np.outer(u, ms)
-    X_centered = X - np.outer(u, mean)
-    X_centered_test = A @ X
     X_del = np.delete(X, 0, axis=1)
-    print(X_del)
     K = X_del @ X_del.T  #+ np.eye(n) * lbd
-    K_reg = K + np.eye(n) * lbd
-    print(np.outer(u, mean))
-    print("X_del\n ", X_del)
-    X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
-    print("X_del_centered\n ", X_del_centered)
-    K_centered_test = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
-    #ns = np.sum(ms)
-    
-    X_centered_test = A @ X
-    print("X_cecntered-test\n", X_centered_test)
-    K_centered_test2 = A @ K @ A.T + np.eye(n) * lbd 
-    w = K @ ms
-    print("w ", w)
-    print("mean ", mean)
-    sw = np.outer(w, u) + np.outer(u, w)
-    print("sw ", sw)
-    #K_centered = K - sw + np.outer(u, u) * np.sum(w * ms) + np.eye(n) * lbd
-    print(make_centered_kernel_matrix(K, M[:, 0]))
-    K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, M[:, 0]) #+ np.eye(n) * lbd  # K_m means "K times m"
+    K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, M[:, 0]) if intercept else (K, np.zeros(n), 0)
     K_centered_reg = K_centered + np.eye(n) * lbd
-    #K_centered = K - np.outer(u, w) - np.outer(w, u) + np.outer(u, u) * np.sum(w * ms)
-    print("K_centered \n",  K_centered_reg)
-    print("K_centered_test \n",  K_centered_test)
-    print("K_centered_test2 \n",  K_centered_test2)
-    np.testing.assert_allclose(K_centered_reg, K_centered_test)
-    np.testing.assert_allclose(K_centered_reg, K_centered_test2)
+    #K_centered_test = compute_centered_kernel_matrix_regulirized_manually_2(X, M[:, 0], lbd, intercept)
+    #K_centered_test2 = compute_centered_kernel_matrix_regulirized_manually(K, M[:, 0], lbd, intercept)
+    #np.testing.assert_allclose(K_centered_reg, K_centered_test)
+    #np.testing.assert_allclose(K_centered_reg, K_centered_test2)
     K_centered_reg_inv = np.linalg.inv(K_centered_reg)
-    print("masks \n", M)
     for h in range(nbr_it_gs):
         print("\n\n CURRENT ITERATION GIBBS SANMPLING ", h, "\n")
         old_X = X
@@ -913,15 +878,14 @@ def gibb_sampl_over_parametrized_sampling(info):
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
-            print("i: ", i)
-            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K_centered_reg, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=sampling)
+            #print("i: ", i)
+            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K_centered_reg, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=sampling, intercept=intercept)
             #print("round ", i, ": imputed matrix gs overp\n", X)
             #input()
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
                 v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
                 current_mask = M[:,(i+1)] if i<d-1 else M[:, 0]
-                ms = (1 - current_mask) / np.sum(1 - current_mask)  # ms[i] = 1 iff component is seen
                 
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_add, 1.0)
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_remove, -1.0)
@@ -929,28 +893,22 @@ def gibb_sampl_over_parametrized_sampling(info):
                 U = np.array([K_m, u]).T
                 K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)  # now we should have K_reg_inv = (K + lbd Id)^(-1)
 
-                #
-                # print("who is X \n", X)
-                #print("K_centered reg inv\n ", K_centered_reg_inv)
-
                 K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
-                #print("K_centered reg inv test\n ", np.linalg.inv(K + np.eye(n) * lbd))
-
-                K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, current_mask) #+ np.eye(n) * lbd
+                K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, current_mask) if intercept else (K, np.zeros(n), 0)
                 K_centered_reg = K_centered + np.eye(n) * lbd
                 U = np.array([K_m, -u]).T
-
-                A = np.eye(n) - np.outer(u, ms)
-                K_centered_reg_test2 = A @ K @ A.T + np.eye(n) * lbd
-                #np.testing.assert_allclose(K_centered_reg, K_centered_reg_test2)
 
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, u * np.sqrt(m_K_m), 1.0)
                 K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)
 
-                K_centered_reg_test2_inv = np.linalg.inv(K_centered_reg_test2)
-                #print("my   inv\n ", K_centered_reg_inv)
-                #print("test inv\n ", K_centered_reg_test2_inv)
+                #K_centered_reg_test2 = compute_centered_kernel_matrix_regulirized_manually(K, current_mask, lbd)
+                #K_centered_reg_test2_inv = np.linalg.inv(K_centered_reg_test2)
                 #np.testing.assert_allclose(K_centered_reg_inv, K_centered_reg_test2_inv)
+                #if not intercept:
+                    #print("check if intercept is false")
+                    #np.testing.assert_allclose(K + np.eye(n) * lbd, K_centered_reg)
+                    #KKK_inv = np.linalg.inv(K + np.eye(n) * lbd)
+                    #np.testing.assert_allclose(KKK_inv, K_centered_reg_inv)
                 #input()
     return X
 
