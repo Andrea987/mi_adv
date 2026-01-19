@@ -846,8 +846,10 @@ def gibb_sampl_over_parametrized_sampling(info):
     ## Gibb sampling in an overparametrized setting
     X = info['data']
     M = info['masks']
-    M[1, 1] = 1
+    sampling = info['sampling'] if 'sampling' in info else True
+    #M[1, 1] = 1
     X_nan = X.copy()
+    original_X = X.copy()
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
@@ -902,12 +904,19 @@ def gibb_sampl_over_parametrized_sampling(info):
     K_centered_reg_inv = np.linalg.inv(K_centered_reg)
     print("masks \n", M)
     for h in range(nbr_it_gs):
+        print("\n\n CURRENT ITERATION GIBBS SANMPLING ", h, "\n")
+        old_X = X
+        #diff = np.sum((X - old_X)**2)
+        #stat, pvalue = Energy().test(original_X, old_X)
+        #print("stat ", stat , "p value ", pvalue)
+        #input()
         for i in range(d):
             #print("index ", i)
             #idx = i if i<d-1 else 0
             print("i: ", i)
-            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K_centered_reg, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=True)
+            X = impute_matrix_over_parametrized_sampling(X=X, m=M[:, i], K=K_centered_reg, K_inv=K_centered_reg_inv, lbd=lbd, idx=i, sampling=sampling)
             #print("round ", i, ": imputed matrix gs overp\n", X)
+            #input()
             if h < nbr_it_gs-1 or i < d-1:
                 v_to_add = X[:, i]
                 v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
@@ -920,11 +929,12 @@ def gibb_sampl_over_parametrized_sampling(info):
                 U = np.array([K_m, u]).T
                 K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)  # now we should have K_reg_inv = (K + lbd Id)^(-1)
 
-                print("who is X \n", X)
-                print("K_centered reg inv\n ", K_centered_reg_inv)
+                #
+                # print("who is X \n", X)
+                #print("K_centered reg inv\n ", K_centered_reg_inv)
 
                 K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
-                print("K_centered reg inv test\n ", np.linalg.inv(K + np.eye(n) * lbd))
+                #print("K_centered reg inv test\n ", np.linalg.inv(K + np.eye(n) * lbd))
 
                 K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, current_mask) #+ np.eye(n) * lbd
                 K_centered_reg = K_centered + np.eye(n) * lbd
@@ -932,16 +942,16 @@ def gibb_sampl_over_parametrized_sampling(info):
 
                 A = np.eye(n) - np.outer(u, ms)
                 K_centered_reg_test2 = A @ K @ A.T + np.eye(n) * lbd
-                np.testing.assert_allclose(K_centered_reg, K_centered_reg_test2)
+                #np.testing.assert_allclose(K_centered_reg, K_centered_reg_test2)
 
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, u * np.sqrt(m_K_m), 1.0)
                 K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)
 
                 K_centered_reg_test2_inv = np.linalg.inv(K_centered_reg_test2)
-                print("my   inv\n ", K_centered_reg_inv)
-                print("test inv\n ", K_centered_reg_test2_inv)
-                np.testing.assert_allclose(K_centered_reg_inv, K_centered_reg_test2_inv)
-                input()
+                #print("my   inv\n ", K_centered_reg_inv)
+                #print("test inv\n ", K_centered_reg_test2_inv)
+                #np.testing.assert_allclose(K_centered_reg_inv, K_centered_reg_test2_inv)
+                #input()
     return X
 
 
@@ -1032,13 +1042,13 @@ def test_gibb_sampl_over_parametrized_sampling():
     # the test consists in running IterativeImputer with Ridge Regression,
     # and our handmade gibb sampling function
     print("test gibb sampl under parametr started")
-    n = 9
+    n = 20
     print("sqrt n ", np.sqrt(n))
     print("n ** (3/4)", n ** (3/4))
     print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 15
+    d = 17
     gaussian = True
-    lbd = 5.98765 + 0.0
+    lbd = 1.10 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
@@ -1063,7 +1073,7 @@ def test_gibb_sampl_over_parametrized_sampling():
         X = np.random.multivariate_normal(mean, cov, size=n)
         #print(X)
         #input()
-    M = np.random.binomial(1, 0.3, size=(n, d))
+    M = np.random.binomial(1, 0.4, size=(n, d))
     #print(M)
     for i in range(n):
         if np.sum(M[i, :]) == 0:
@@ -1119,6 +1129,6 @@ def test_gibb_sampl_over_parametrized_sampling():
 
 
 #test_gibb_sampl_under_parametrized_sampling()
-test_gibb_sampl_over_parametrized_sampling()
+#test_gibb_sampl_over_parametrized_sampling()
 
 

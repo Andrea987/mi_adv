@@ -3,6 +3,7 @@ import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
+from tsp import gibb_sampl_over_parametrized_sampling
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
 from utils import make_centered_kernel_matrix, update_inverse_rk2_sym
 from sklearn.experimental import enable_iterative_imputer
@@ -146,12 +147,14 @@ def test_make_centered_covariance_matrix():
     A = np.eye(n) - np.outer(u, ms)
     X_del = np.delete(X, 0, axis=1)
     K = X_del @ X_del.T
-    K_centered = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd
+    #K_centered = make_centered_kernel_matrix(K, M[:, 0]) + np.eye(n) * lbd
+    K_centered, K_m, m_K_m = make_centered_kernel_matrix(K, M[:, 0]) #+ np.eye(n) * lbd
+    K_centered_reg = K_centered + np.eye(n) * lbd
     X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
     K_centered_test = X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)    
     K_centered_test2 = A @ K @ A.T + np.eye(n) * lbd 
-    np.testing.assert_allclose(K_centered, K_centered_test)
-    np.testing.assert_allclose(K_centered, K_centered_test2)
+    np.testing.assert_allclose(K_centered_reg, K_centered_test)
+    np.testing.assert_allclose(K_centered_reg, K_centered_test2)
     print("test_make_centered_covariance_matrix ended successufully")
 
 test_make_centered_covariance_matrix()
@@ -381,6 +384,69 @@ def test_gibb_sampl_over_parametrized():
     np.testing.assert_allclose(res, res_skl)
     print("check skl vs my under parametrized passed successfully")
     print("test gibb sample over parametr ended successfully")
+
+
+def test_gibb_sampling_over_parametrized_sampling():
+    # no sampling, check against ridge regression with intercept
+    print("test gibb sampling overparametrized began")
+    n, d = 10, 15
+    lbd = 2.321096 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
+    #print(X_orig.dtype)
+    #print("max min ")
+    #mean = np.mean(X_orig, axis=0)
+    #std = np.std(X_orig, axis=0)
+    # Standardize
+    #X = (X_orig - mean) / std
+    X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    M = np.random.binomial(1, 0.5, size=(n, d))
+    for ii in range(d):
+        nbr = np.random.randint(0, n)
+        #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
+        if np.sum(M[:, ii]) == n:
+            print("add a random seen component")
+            M[nbr, ii] = 0
+    print(M)
+    #input()
+    #M[-1, 0] = 0
+    #print("exponent", exponent)
+    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    #print(X_nan)
+    R = 3
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'batch_size': 64,
+        'verbose': 0,
+        'initial_strategy': 'mean',
+        'exponent_d': 0.75,
+        'sampling': False
+    }
+    res = gibb_sampl_over_parametrized_sampling(info_dic)
+    #res_std = gibb_sampl(info_dic)
+    #print("final res_std\n", res_std)
+    #print("final res\n", res)
+    #np.testing.assert_allclose(res, res_std)
+
+    print("It imputer Ridge Reg")
+    ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=True, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
+    res_skl = ice_skl.fit_transform(X_nan)
+    np.testing.assert_allclose(res, res_skl)
+    print("check skl vs my under parametrized passed successfully")
+    print("test gibb sample over parametr ended successfully")
+
+test_gibb_sampling_over_parametrized_sampling()
+
+input()
 
 test_flip_matrix()
 test_split_upd()

@@ -340,10 +340,10 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         Q_ii = np.delete(Q_i, idx, axis=1)
         v = -(1 / Q[idx, idx]) * Q_i[:, idx]
         vv = np.linalg.inv(Cov_ii) @ Cov_i[:, idx] #np.linalg.solve(Q_ii, Cov_i)
-        print("v  ", v, "\nvv ", vv)
+        #print("v  ", v, "\nvv ", vv)
         uuuu = np.ones(X.shape[0])
         prediction1 = mean[idx] + (X_i - np.outer(uuuu, mean_i)) @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
-        print("prediction 1 ", prediction1)
+        #print("prediction 1 ", prediction1)
 
 
         # TO DO: FIND THE REASON THE TWO PREDICTIONS ARE DIFFERENT
@@ -370,20 +370,21 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling)
         x = Xm @ partial + lbd * v
         x = - x
     if sampling and n_m>0:
-        print("K\n ", K)  # K is the regularize centered kernel matrix
+        print("you are sampling")
+        #print("K\n ", K)  # K is the regularize centered kernel matrix
         K_S = K[m == 0, :][:, m == 0]  # submatrix of seen components
         Xss = X_s - np.mean(X_s)
         print("test variacen ", np.sum(Xss * Xss))
-        print("Xss ", Xss)
+        #print("Xss ", Xss)
         x1 = np.linalg.solve(K_S, Xss)
         K_S_not_reg = K_S - np.eye(n_s) * lbd
         cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
-        print("my cov   ", cov_i_given_rest)
+        #print("my cov   ", cov_i_given_rest)
         cov_test, _, _, _ = compute_stats(X, m, lbd, idx)
-        print("test cov ", cov_test / n_s)
+        #print("test cov ", cov_test / n_s)
         #input()
         prediction = x
-        print("predictions ", prediction)
+        #print("predictions ", prediction)
         sample = np.random.multivariate_normal(mean = prediction, cov = cov_i_given_rest * np.eye(n_m))
         x = sample
     X[m == 1, idx] = x
