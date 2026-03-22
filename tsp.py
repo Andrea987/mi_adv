@@ -558,7 +558,7 @@ def gibb_sampl_under_parametrized_sampling(info):
     M = info['masks']
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
-    print(M)
+    #print(M)
     if original_X.shape[1] == 2:
         plt.scatter(original_X[:, 0], original_X[:, 1])
         plt.scatter(original_X[M[:, 0] == 1, 0], original_X[M[:, 0] == 1, 1])
@@ -640,7 +640,7 @@ def gibb_sampl_under_parametrized_sampling(info):
     old_X = X
     print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
-        print("\n\n CURRENT ITERATION GIBBS SANMPLING ", h, "\n")
+        print("\n\n CURRENT ITERATION GIBBS SANMPLING IN UNDERPARAMETRIZED SAMPLING ", h, "\n")
         old_X = X
         #diff = np.sum((X - old_X)**2)
         stat, pvalue = Energy().test(original_X, old_X)
@@ -823,8 +823,10 @@ def gibb_sampl_over_parametrized_sampling(info):
     #np.testing.assert_allclose(K_centered_reg, K_centered_test2)
     K_centered_reg_inv = np.linalg.inv(K_centered_reg)
     for h in range(nbr_it_gs):
-        print("\n\n CURRENT ITERATION GIBBS SANMPLING ", h, "\n")
+        print("\n\n CURRENT ITERATION GIBBS SANMPLING OVER PARAMETRIZED", h, "\n")
         old_X = X
+        stat, pvalue = Energy().test(original_X, old_X)
+        print("stat ", stat , "p value ", pvalue)
         #diff = np.sum((X - old_X)**2)
         #stat, pvalue = Energy().test(original_X, old_X)
         #print("stat ", stat , "p value ", pvalue)
@@ -992,8 +994,8 @@ def test_gibb_sampl_over_parametrized_sampling():
     #print(M)
     for i in range(n):
         if np.sum(M[i, :]) == 0:
- #           ss = np.random.rand()
- #           print(ss)
+#           ss = np.random.rand()
+#           print(ss)
 #            input()
             M[i, 0] = 0 if np.random.rand()>0.5 else 1
     #exponent = (n ** (3/4)) / n

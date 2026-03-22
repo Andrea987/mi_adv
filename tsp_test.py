@@ -388,11 +388,16 @@ def test_gibb_sampl_over_parametrized():
 
 def test_gibb_sampling_over_parametrized_sampling():
     # no sampling, check against ridge regression with intercept
-    print("test gibb sampling overparametrized began")
-    n, d = 6, 10
-    lbd = 1.321096 + 0.0
+    print("test gibb sampling OVERPARAMETRIZED SAMPLING began")
+    n, d = 40, 50
+    lbd = 0.5121 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
+    mean = np.random.rand(d)
+    cov = np.random.rand(n, d)
+    cov = cov.T @ cov + np.eye(d) * 0.1
+    #print(cov)
+    X_orig = np.random.multivariate_normal(mean, cov, size=n)
     #print(X_orig.dtype)
     #print("max min ")
     #mean = np.mean(X_orig, axis=0)
@@ -417,7 +422,7 @@ def test_gibb_sampling_over_parametrized_sampling():
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     #print(X_nan)
-    R = 2
+    R = 5
     info_dic = {
         'data': X,
         'masks': M,
@@ -458,10 +463,15 @@ def test_gibb_sampling_over_parametrized_sampling():
 def test_gibb_sampl_under_parametrized_sampling():
     # no sampling, check against ridge regression with intercept
     print("test gibb sampling udnerparametrized_sampling began")
-    n, d = 100, 4
-    lbd = 4.321096 + 0.0
+    n, d = 100, 7
+    lbd = 0.321096 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    #X_orig = np.random.rand(n, d) + 0.0
+    X_orig = np.random.rand(n, d) + 0.0
+    mean = np.random.rand(d)
+    cov = np.random.rand(n, d)
+    cov = cov.T @ cov + np.eye(d) * 0.1
+    #print(cov)
+    X_orig = np.random.multivariate_normal(mean, cov, size=n)
     #print(X_orig.dtype)
     #print("max min ")
     #mean = np.mean(X_orig, axis=0)
@@ -477,7 +487,7 @@ def test_gibb_sampl_under_parametrized_sampling():
         if np.sum(M[:, ii]) == n:
             print("add a random seen component")
             M[nbr, ii] = 0
-    print(M)
+    #print(M) if n<=10 else print("too many observations, no printing of the mask in tsp_test: ", n)
     #input()
     #M[-1, 0] = 0
     #print("exponent", exponent)
@@ -486,7 +496,7 @@ def test_gibb_sampl_under_parametrized_sampling():
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     #print(X_nan)
-    R = 3
+    R = 10
     info_dic = {
         'data': X,
         'masks': M,
@@ -510,8 +520,8 @@ def test_gibb_sampl_under_parametrized_sampling():
     print("It imputer Ridge Reg")
     ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=True, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     res_skl = ice_skl.fit_transform(X_nan)
-    print("res\n", res)
-    print("res sskl\n", res_skl)
+    #print("res\n", res)
+    #print("res sskl\n", res_skl)
     np.testing.assert_allclose(res, res_skl)
     print("check skl vs my under parametrized passed successfully\n\n NEW TRIAL, NO INTERCEPT")
 
@@ -527,9 +537,11 @@ def test_gibb_sampl_under_parametrized_sampling():
 
 
 test_gibb_sampl_under_parametrized_sampling()
+test_gibb_sampl_over_parametrized()
+test_gibb_sampling_over_parametrized_sampling()
 
 
-input()
+#input()
 
 test_flip_matrix()
 test_split_upd()
