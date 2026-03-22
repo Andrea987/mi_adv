@@ -202,7 +202,10 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
     # M masks, 0 seen, 1 missing
     # i current iteration when sweeping the column
     X = XX.copy()
+    n, d = X.shape
     #print("masks \n", M)
+    #mmean = np.mean(X, axis=0)
+    #S = X.T @ X - n * np.outer(mmean, mmean) + 1.1 * np.eye(d)
     n, d = X.shape
     xi = X[:, i]
     X_i = np.delete(X, i, axis=1)
@@ -215,6 +218,7 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
     #check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
     #S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
     S_current = 1 / Q[i, i]
+    #print("S_current ", S_current, "S_current_check ", S_current_check)
     u = np.ones(n)
     prediction = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
 

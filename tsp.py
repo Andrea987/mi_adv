@@ -32,6 +32,8 @@ def gibb_sampl_no_modification(info):
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
     X = imp_mean.fit_transform(X_nan)
+    #sampling = info['sampling'] if 'sampling' in info else False
+    #intercept = info['intercept'] if 'intercept' in info else True
     #print("simple imputer in gibb sample \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
@@ -81,6 +83,7 @@ def gibb_sampl_no_modification(info):
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
             X, _ = impute_matrix_under_parametrized(X, Q, M, i)
+            #X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i, sampling, intercept)
             #print("new X ", X)
             if info['verbose'] > 0:
                 print(X)
@@ -330,8 +333,7 @@ def gibb_sampl(info):
 
 '''let's add the sampling part'''
 
-
-
+'''
 def gibb_sampl_under_parametrized_sampling_max_likelihood(info):
     # flip matrix
     X = info['data']
@@ -453,16 +455,16 @@ def gibb_sampl_under_parametrized_sampling_max_likelihood(info):
                 nup, _ = X_up.shape
                 nfx, _ = X_fx.shape
                 ndw, _ = X_dw.shape
-                '''
-                if nupd + ndwd > n:
-                    idx = i+1 if i<d-1 else 0
-                    print(idx)
-                    R = X[M[:, idx] == 0, :]
-                    #print("first set vct ", R)
-                    #print("first set vct shape ", R.shape)
-                    Rt_R = R.T @ R + lbd * np.eye(d)
-                    Q = np.linalg.inv(Rt_R)
-                '''
+                
+                #if nupd + ndwd > n:
+                #    idx = i+1 if i<d-1 else 0
+                #    print(idx)
+                #    R = X[M[:, idx] == 0, :]
+                #    #print("first set vct ", R)
+                #    #print("first set vct shape ", R.shape)
+                #    Rt_R = R.T @ R + lbd * np.eye(d)
+                #    Q = np.linalg.inv(Rt_R)
+                
                 idx = i+1 if i<d-1 else 0
                 #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
                 old_R = R  # old_seen components, not centered
@@ -545,6 +547,111 @@ def gibb_sampl_under_parametrized_sampling_max_likelihood(info):
     #print("res my imp \n", X)
     print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
+'''
+
+
+
+def gibb_sampl_fast_sampling(info):
+    ## this code implement the fast Gibb sampler, that is consider as covariance matrix the 
+    ## the one obtained by summing all the tensor associated to the vectors of the dataset.
+    ## In the MICE versione, each dataset is composed by a subset of observations
+    X = info['data']
+    M = info['masks']
+    n, d = X.shape
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
+    X = imp_mean.fit_transform(X_nan)
+    sampling = info['sampling'] if 'sampling' in info else False
+    intercept = info['intercept'] if 'intercept' in info else True
+    print("sampling ", sampling, "intercept ", intercept)
+    #print("simple imputer in gibb sample \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
+    #b_s = 5
+    b_s = info['batch_size']
+    #print("batch size ", b_s)
+    if b_s <= 0:
+        b_s = 1
+    #print("who is X in gibb sampl \n", X)
+    #ones = np.ones((d, d)) 
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #print("flip matrix\n", F)
+    #if info['tsp']:
+    #    start_time = time.time()
+    #    permutation, distance = solve_tsp_local_search(F)
+    #    end_time = time.time()
+    #    print("optimal perm ", permutation, "optimal dist ", distance) 
+    #    print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+    #    M = M[:, permutation]
+    #    X = X[:, permutation]
+    #print("\n", X)
+    #print("\n", M)
+    #Ms = matrix_switches(M)
+    #first_mask = M[:, 0]
+    #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    R = X.copy()  # X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1])
+    u = np.ones(R.shape[0])
+    #print(a)
+    #print("\n", np.outer(u, a))
+    R_centered = R - np.outer(u, mean)
+    start1 = time.time()
+    cov = R_centered.T @ R_centered + lbd * np.eye(d)
+    end1 = time.time()
+    print("building the matrix time: ", end1-start1)        
+    Q = np.linalg.inv(cov)
+    start_gibb_s = time.time()
+    upd_j = np.zeros((d, 2))
+    #print("initial X \n", X)
+    for h in range(r):
+        #print("iter ", h)
+        for i in range(d):
+            #print("index gibb sampl no mod", i)
+            X_pre_upd = X
+            #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
+            alpha = R_centered.shape[0]
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean, cov / alpha, Q * alpha, M, i, sampling, intercept)
+            old_mean_rescaled = np.sqrt(n) * mean  # old_mean, before making the update 
+            mean = np.mean(X, axis=0)  # new mean
+            mean_rescaled = np.sqrt(n) * mean  # new mean, after the update
+            if info['verbose'] > 0:
+                print(X)
+            upd_j[i, 0] = 1
+            #start1 = time.time()
+            upd_j[:, 1] = X.T @ (X[:, i] - X_pre_upd[:, i])
+            #end1 = time.time()
+            #print("multiplication time: ", end1-start1)
+            upd_j[i, 1] = np.sum((X[:, i] - X_pre_upd[:, i]) * (X[:, i] + X_pre_upd[:, i])) / 2  
+            Q = update_inverse_rk2_sym(Q, upd_j)
+            upd_j[i, 0] = 0
+            Q = swm_formula(Q, old_mean_rescaled, 1.0)  # updates
+            Q = swm_formula(Q, mean_rescaled, -1.0)  # downdates
+            
+            ## small test
+            mmean = np.mean(X, axis=0)
+            cov = X.T @ X - n * np.outer(mmean, mmean) + lbd * np.eye(d)
+            QQ = np.linalg.inv(cov)
+            #if d<=8 and n<=10:
+                #print("small check QQ\n", QQ)
+                #print("small check Q\n", Q)
+            np.testing.assert_allclose(Q, QQ)
+            #input()
+    return X      
+            
+                
+
+
+
 
 
 

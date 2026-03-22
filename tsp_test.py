@@ -3,7 +3,7 @@ import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
 from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
-from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling
+from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling, gibb_sampl_fast_sampling
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
 from utils import make_centered_kernel_matrix, update_inverse_rk2_sym
 from sklearn.experimental import enable_iterative_imputer
@@ -535,6 +535,52 @@ def test_gibb_sampl_under_parametrized_sampling():
     print("check skl_1 vs my under parametrized_1 passed successfully")
     print("test gibb sample under parametr ended successfully")
 
+
+def test_gibb_sampling_fast_sampling():
+    print("\n\nbeginning test gibb samp fast sampling no modification\n")
+    n = 10
+    d = 6
+    lbd = 0.98932 + 0.0
+    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    #X_orig = np.random.rand(n, d) + 0.0
+    print(X_orig.dtype)
+    print("max min ")
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
+    X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    #print(np.max(X))
+    #print(np.min(X))
+    M = np.random.binomial(1, 0.3, size=(n, d))
+    print("M in gibb sampling fast sampling, tsp_test.py\n", M) if n<=10 and d<=10 else print("")
+    #exponent = (n ** (3/4)) / n
+    #print("exponent", exponent)
+    #M = generate_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
+    #print("masks in test gibb sampl no modification\n", M)
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    #print("X_nan \n", X_nan)
+    R = 4
+    info_dic = {
+        'data': X,
+        'masks': M,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'sampling': True,
+        'intercept': True,
+        'batch_size': 64,
+        'verbose': 0
+    }
+    res = gibb_sampl_fast_sampling(info_dic)
+    print("test gibb sampl fast sampling ended successfully\n\n")    
+
+
+
+test_gibb_sampling_fast_sampling()
+print("pause: input()")
+input()
 
 test_gibb_sampl_under_parametrized_sampling()
 test_gibb_sampl_over_parametrized()
