@@ -568,6 +568,7 @@ def test_gibb_sampling_fast_sampling():
         'lbd_reg': lbd,
         'tsp': False,
         'recomputation': False,
+        'initial_strategy': 'constant',
         'sampling': True,
         'intercept': True,
         'batch_size': 64,

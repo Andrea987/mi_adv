@@ -560,7 +560,7 @@ def gibb_sampl_fast_sampling(info):
     n, d = X.shape
     X_nan = X.copy()
     X_nan[M==1] = np.nan
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='constant')
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = imp_mean.fit_transform(X_nan)
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True

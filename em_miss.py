@@ -28,6 +28,25 @@ def log_lkh(S_inv, H):
     # compute -log |S| - Tr(S^1H)
     return np.linalg.slogdet(S_inv)[1] - np.sum(S_inv * H)
 
+
+def obs_log_lkh(S, mu, M, X):
+    # S_inv inverse kernel matrix
+    # M masks,
+    # X, observations
+    n, d = X.shape
+    res = 0
+    for i in range(n):
+        m = M[i, :]
+        l = np.sum(1-m)  # nbr seen
+        x = X[i, :]
+        xo = x[m==0]
+        Soo = S[m==0, :][:, m==0]
+        mu0 = mu[m==0]
+        Soo_inv = np.linalg.inv(Soo)
+        h = np.outer(xo-mu0, xo-mu0)
+        res = res + np.linalg.slogdet(Soo_inv)[1] - np.sum(Soo_inv * h)
+    return res
+
 def em_miss(info):
     # compute mean and covariance matrix of some data
     # X = [x1|..|xn]ˆT, xi \in Rˆd
@@ -40,11 +59,12 @@ def em_miss(info):
     current_mean1 = np.mean(X, axis=0)
     #S1 = info['starting_point'] if 'starting_point' in info else np.eye(d)
     S1 = X.T @ X /n - np.outer(current_mean1, current_mean1) + lbd * np.eye(d)
-    print("emp mean cm1 \n", current_mean1)
-    print("true emp cov S1\n", S1)
+    print("mean with full data, no missing \n", current_mean1)
+    print("covariance matrix with full data\n", S1)
     #print("X in em_miss ", X)
     original_X = X
     M = info['masks']
+    print("sampling :::::: ", info['sampling'])
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
     if original_X.shape[1] == 2:
@@ -59,7 +79,10 @@ def em_miss(info):
     current_mean = np.mean(X, axis=0)
     S = info['starting_point'] if 'starting_point' in info else np.eye(d)
     S = X.T @ X /n - np.outer(current_mean, current_mean) + lbd * np.eye(d)
-    
+    SS = np.cov(X, rowvar=False, bias=True)
+    #print("covariance matrices")
+    #print(S)
+    #print(SS)
     #mu = np.mean(X, axis=0)
     tol = info['tolerance']    
     R = info['nbr_it_em']
@@ -70,7 +93,10 @@ def em_miss(info):
     old_cov = S
     new_cov = S
     Q = np.linalg.inv(new_cov)
+    print("prints imputed dataset \n", X)
     while it<R and err>=tol:
+        if it % 20 == 0:
+            print(it)
         current_cov = np.zeros((d, d))
         current_cov1 = np.zeros((d, d))
         for i in range(n):
@@ -87,22 +113,33 @@ def em_miss(info):
             #print("submatrices")
             #print(Soo), print(Som), print(Smo), print(Smm)
             #print("end submatrices")
-            Soo_inv = np.linalg.inv(Soo)
-            mu_cond_check = mum + Smo @ Soo_inv @ (xo - muo)
-            S_cond_check = Smm - Smo @ Soo_inv @ Som
+            #Soo_inv = np.linalg.inv(Soo)
+            #mu_cond_check = mum + Smo @ Soo_inv @ (xo - muo)
+            #S_cond_check = Smm - Smo @ Soo_inv @ Som
             S_cond = np.linalg.inv(Qmm)
+            #print("S cond check")
             #print(S_cond)
             #print(S_cond_check)
-            mu_cond = mum - S_cond_check @ Qmo @ (xo - muo)
+            mu_cond = mum - S_cond @ Qmo @ (xo - muo)
+            #print("mu cond vs mu cond check")
             #print(mu_cond)
             #print(mu_cond_check)
-            x[m==1] = mu_cond 
-            #print(x)
             embed_cond_cov = np.zeros_like(current_cov)
-            #print(np.ix_(m==1,m==1))
-            embed_cond_cov[np.ix_(m==1, m==1)] = S_cond
-            #print(embed_cond_cov[m==1, :][:, m==1])
-            #print("embed cond conv \n", embed_cond_cov)
+            if sampling and np.sum(m)>0:
+                sample =  np.random.multivariate_normal(mu_cond, S_cond)
+                x[m==1] = sample
+                #print(sampling)
+                #print(x)
+                #print("some prints, you are sampling")
+                #input()
+            else:
+                x[m==1] = mu_cond
+                #print(x)
+                #print(np.ix_(m==1,m==1))
+                embed_cond_cov[np.ix_(m==1, m==1)] = S_cond
+                #print(embed_cond_cov[m==1, :][:, m==1])
+                #print("embed cond conv \n", embed_cond_cov)
+                #input()
             X[i, :] = x
             #print(X)
             v = np.outer(x, x) + embed_cond_cov
@@ -114,12 +151,17 @@ def em_miss(info):
             #print(Soo), print(Som), print(Smo), print(Smm)
             #print("end submatrices")
             #input()
-        print("end of loop")
+        #print("end of loop")
         current_mean = np.mean(X, axis=0)
         old_cov = new_cov
         new_cov = current_cov - np.outer(current_mean, current_mean)
+        S = new_cov
+        current_obs_log_lkh = obs_log_lkh(new_cov, current_mean, M, original_X) 
+        #current_obs_log_lkh1 = obs_log_lkh(new_cov, current_mean, M, X) 
+        #print("current obs log lkh (shoyld be increasing)", current_obs_log_lkh)
+        #print("current obs log lkh (shoyld be increasing)", current_obs_log_lkh1) 
         err = np.sqrt(np.sum((old_cov - new_cov)**2))
-        print("err ", err)
+        #print("err ", err)
         #current_cov1 = current_cov1 / n
         #print(current_cov1)
         #print(current_cov) 
@@ -129,28 +171,28 @@ def em_miss(info):
         Q_S_new__S_old = log_lkh(Q, new_cov) 
         diff = Q_S_new__S_old - Q_S_old__S_old
         diff = (n/2) * diff
-        print("difference, should be >=0 ", diff)
+        #print("difference, should be >=0 ", diff)
         it = it + 1
     print("fin res \n", new_cov)
     print("gt cov \n", info['cov_gt'])
     print("current mean ", current_mean)
     print("gt mean ", info['mean_gt'])
-    return 0
+    return {'cov_em':new_cov, 'mean_em':current_mean}
 
 
 def small_test_em_miss():
     print("small test em miss")
-    n = 1000
-    d = 5
+    n = 10
+    d = 3
     lbd = 0.0 + 0.0
-    #X_orig = np.random.randint(0, 6, size=(n, d)) + 0.0
+    X_orig = np.random.randint(0, 6, size=(n, d)) + 0.0
     mean = np.random.rand(d)
     cov1 = np.random.rand(n, d)
-    cov1 = np.random.randint(0, 5, (n, d))
+    #cov1 = np.random.randint(0, 5, (n, d))
     cov = (cov1.T @ cov1)/n + np.eye(d) * 0.1
     X_orig = np.random.multivariate_normal(mean, cov, size=n)
     X = X_orig
-    M = np.random.binomial(1, 0, size=(n, d))
+    M = np.random.binomial(1, 0.2, size=(n, d))
     for i in range(n):
         m = M[i, :]
         j = np.random.randint(0, d)
@@ -174,13 +216,14 @@ def small_test_em_miss():
         'intercept': True,
         'batch_size': 64,
         'verbose': 0, 
+        'sampling': True,
         'cov_gt': cov,
         'mean_gt': mean
     }
     em_miss(info_dic)
     print("end small test em miss")
 
-small_test_em_miss()
+#small_test_em_miss()
 
 
 
