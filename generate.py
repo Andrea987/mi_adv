@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 
 def generate_dataset(data, n_tot, dim, beta_gt, perc_test, p_miss, err):
-    print(data)
+    print("data in generate\n", data)
     if data['data'] == 'Gaussian':
       X_complete = np.random.randn(n_tot, dim)
     elif data['data'] == 'Normal':
@@ -39,7 +39,7 @@ def generate_dataset(data, n_tot, dim, beta_gt, perc_test, p_miss, err):
     #elif err['type'] == 'Gaussian':
     #  error = np.random.randn(n_tot) * err['scaling']
 
-    print(X_complete.shape)
+    print("shape X_complete ", X_complete.shape)
 
     y_complete = X_complete @ beta_gt + error  #np.random.randn(n_tot) * err  # (np.random.rand(n_tot) - 0.5) * err
     X_train, X_test, y_train, y_test = train_test_split(X_complete, y_complete, test_size=perc_test)

@@ -11,7 +11,7 @@ def best_predictor(X, coeff, y):
   hat_y = (X @ coeff).T  # (n, d) @ (d, m) = (n, m)
   r = hat_y - y  # residual
   score = np.mean(r * r, axis=1)
-  print("scores:  ", score)
+  print("scores in best_predictor:  ", score)
   i_min = np.argmin(score)
   return coeff[:, i_min], score[i_min]
 
@@ -287,8 +287,6 @@ def compute_stats_mean(X, m, lbd, idx, intercept):
     uuuuu = np.ones(nm)
     prediction1 = mean[idx] + (X_i[m == 1, :] - np.outer(uuuuu, mean_i)) @ v[:, None]  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
     return prediction1
-
-
 
 
 def compute_centered_kernel_matrix_regulirized_manually(K, m, lbd, intercept):

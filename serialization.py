@@ -43,9 +43,9 @@ res = serialization_first_idea(F)
 #print(res)
 
 t = d
-print(F)
+#print("in serialization print F\n", F)
 superdiag = np.diag(F, k=1)
-print("orignial cost ", np.sum(superdiag), "\n")
+#print("orignial cost inf serialization", np.sum(superdiag), "\n")
 #for j in range(d):
 #    res1, cost1 = serialization_first_idea(F)
     #print(res1)

@@ -72,7 +72,7 @@ def gibb_sampl_no_modification(info):
     start1 = time.time()
     Rt_R = R.T @ R + lbd * np.eye(d)
     end1 = time.time()
-    print("building the matrix time: ", end1-start1)        
+    print("building the matrix time in gibb sampl no modification: ", end1-start1)        
     Q = np.linalg.inv(Rt_R)
     start_gibb_s = time.time()
     upd_j = np.zeros((d, 2))
@@ -86,7 +86,7 @@ def gibb_sampl_no_modification(info):
             #X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i, sampling, intercept)
             #print("new X ", X)
             if info['verbose'] > 0:
-                print(X)
+                print("print X in verbose \n", X)
             upd_j[i, 0] = 1
             #start1 = time.time()
             upd_j[:, 1] = X.T @ (X[:, i] - X_pre_upd[:, i])
@@ -208,7 +208,7 @@ def gibb_sampl_under_parametrized(info):
         current_permutation = permutation
         
         original_cost = np.sum(np.diag(F, k=1))
-        print("original cost ", original_cost)
+        print("original cost in tsp", original_cost)
         #print("optimal perm ", permutation, "optimal dist ", distance) 
         distances = []
         distances.append(distance)
@@ -625,7 +625,7 @@ def gibb_sampl_fast_sampling(info):
             mean = np.mean(X, axis=0)  # new mean
             mean_rescaled = np.sqrt(n) * mean  # new mean, after the update
             if info['verbose'] > 0:
-                print(X)
+                print("print X\n in gibb sampling fast ", X)
             upd_j[i, 0] = 1
             #start1 = time.time()
             upd_j[:, 1] = X.T @ (X[:, i] - X_pre_upd[:, i])
@@ -699,7 +699,7 @@ def gibb_sampl_under_parametrized_sampling(info):
         current_permutation = permutation
         
         original_cost = np.sum(np.diag(F, k=1))
-        print("original cost ", original_cost)
+        print("original cost in tsp2", original_cost)
         #print("optimal perm ", permutation, "optimal dist ", distance) 
         distances = []
         distances.append(distance)

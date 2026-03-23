@@ -233,7 +233,7 @@ def test_gibb_sampl_no_modification():
     lbd = 1 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     #X_orig = np.random.rand(n, d) + 0.0
-    print(X_orig.dtype)
+    print("gibb sampl no modification ", X_orig.dtype)
     print("max min ")
     mean = np.mean(X_orig, axis=0)
     std = np.std(X_orig, axis=0)
@@ -413,7 +413,7 @@ def test_gibb_sampling_over_parametrized_sampling():
         if np.sum(M[:, ii]) == n:
             print("add a random seen component")
             M[nbr, ii] = 0
-    print(M)
+    print("M in test gibb samplig overparametrized\n ", M)
     #input()
     #M[-1, 0] = 0
     #print("exponent", exponent)
@@ -580,7 +580,6 @@ def test_gibb_sampling_fast_sampling():
 
 test_gibb_sampling_fast_sampling()
 print("pause: input()")
-input()
 
 test_gibb_sampl_under_parametrized_sampling()
 test_gibb_sampl_over_parametrized()
