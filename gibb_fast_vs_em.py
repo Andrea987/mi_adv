@@ -27,9 +27,9 @@ import ot
 
 def test_gibb_fast_vs_em():
     print("gibb fast vs em")
-    n = 600
-    d = 5
-    lbd = 0.1 + 0.0
+    n = 700
+    d = 3
+    lbd = 0.001 + 0.0
     X_orig = np.random.randint(0, 6, size=(n, d)) + 0.0
     mean = np.random.rand(d)
     cov1 = np.random.rand(n, d)
@@ -44,7 +44,7 @@ def test_gibb_fast_vs_em():
     print(true_cov_full_data)
 
     X = X_orig
-    M = np.random.binomial(1, 0.45, size=(n, d))
+    M = np.random.binomial(1, 0.2, size=(n, d))
     for i in range(n):
         m = M[i, :]
         j = np.random.randint(0, d)
@@ -75,7 +75,7 @@ def test_gibb_fast_vs_em():
     cov_em = res_em['cov_em']
     mean_em = res_em['mean_em']
 
-    R = 4
+    R = 200
     info_gibb_fast = {
         'data': X_orig,
         'masks': M,
@@ -91,8 +91,10 @@ def test_gibb_fast_vs_em():
     }
 
     res_fast_gibbs = gibb_sampl_fast_sampling(info_gibb_fast)
-    cov_gbsf = np.cov(res_fast_gibbs, rowvar=False, bias=True)
-    mean_gbsf = np.mean(res_fast_gibbs, axis=0)
+    X_gibbs = res_fast_gibbs['imputed_dts']
+    cov_gbsf = np.cov(X_gibbs, rowvar=False, bias=True)
+    cov_gbsf = res_fast_gibbs['RM_cov']
+    mean_gbsf = np.mean(X_gibbs, axis=0)
 
     print("EM")
     print(cov_em)
@@ -106,7 +108,11 @@ def test_gibb_fast_vs_em():
     print(true_cov_full_data)
     print(true_mean_full_data)
     
-    
+    print("\ntrue mean and cov, from sampling distribution")
+    print(mean)
+    print(cov)
+
+
     print("\nend test gibb fast vs em")
 
 

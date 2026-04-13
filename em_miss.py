@@ -64,7 +64,7 @@ def em_miss(info):
     #print("X in em_miss ", X)
     original_X = X
     M = info['masks']
-    print("sampling :::::: ", info['sampling'])
+    print("sampling in em_miss :::::: ", info['sampling'])
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
     if original_X.shape[1] == 2:
@@ -93,7 +93,7 @@ def em_miss(info):
     old_cov = S
     new_cov = S
     Q = np.linalg.inv(new_cov)
-    print("prints imputed dataset \n", X)
+    #print("prints imputed dataset \n", X)
     while it<R and err>=tol:
         if it % 20 == 0:
             print(it)

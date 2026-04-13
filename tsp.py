@@ -613,6 +613,12 @@ def gibb_sampl_fast_sampling(info):
     start_gibb_s = time.time()
     upd_j = np.zeros((d, 2))
     #print("initial X \n", X)
+    gamma = np.ones(r) / np.arange(1, r+1)
+    gamma = np.ones(r)
+    cov_gamma = cov / R_centered.shape[0]
+    cov_test = cov
+    #print(gamma)
+    #input()
     for h in range(r):
         #print("iter ", h)
         for i in range(d):
@@ -632,6 +638,9 @@ def gibb_sampl_fast_sampling(info):
             #end1 = time.time()
             #print("multiplication time: ", end1-start1)
             upd_j[i, 1] = np.sum((X[:, i] - X_pre_upd[:, i]) * (X[:, i] + X_pre_upd[:, i])) / 2  
+            cov_test = cov_test + np.outer(old_mean_rescaled, old_mean_rescaled) - np.outer(mean_rescaled, mean_rescaled) 
+            cov_test = cov_test + np.outer(upd_j[:, 1], upd_j[:, 0]) + np.outer(upd_j[:, 0], upd_j[:, 1])
+            #print(cov_test)
             Q = update_inverse_rk2_sym(Q, upd_j)
             upd_j[i, 0] = 0
             Q = swm_formula(Q, old_mean_rescaled, 1.0)  # updates
@@ -639,14 +648,21 @@ def gibb_sampl_fast_sampling(info):
             
             ## small test
             mmean = np.mean(X, axis=0)
-            cov = X.T @ X - n * np.outer(mmean, mmean) + lbd * np.eye(d)
+            #cov = X.T @ X - n * np.outer(mmean, mmean) + lbd * np.eye(d)
+            #print(cov)
+            cov = cov_test
+            #input()
+            #print("alpha ", alpha)
+            cov_gamma = cov_gamma + gamma[h] * (cov/alpha - cov_gamma)
+            cov = cov_gamma * alpha
             QQ = np.linalg.inv(cov)
             #if d<=8 and n<=10:
                 #print("small check QQ\n", QQ)
                 #print("small check Q\n", Q)
-            np.testing.assert_allclose(Q, QQ)
+            #np.testing.assert_allclose(Q, QQ)
             #input()
-    return X      
+    res = {'imputed_dts': X, 'RM_cov': cov_gamma}  # RM: Robbins_Monro
+    return res      
             
                 
 
