@@ -601,3 +601,11 @@ test_gibb_sampl_under_parametrized()
 test_gibb_sampl_over_parametrized()
 test_gibb_sampling_over_parametrized_sampling()
 
+
+
+
+
+
+
+
+
