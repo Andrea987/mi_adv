@@ -1,6 +1,8 @@
 import numpy as np
 from sklearn.impute import SimpleImputer
 from itertools import product
+import matplotlib.pyplot as plt
+
 
 
 def generate_binary_arrays(n):
@@ -307,5 +309,48 @@ def compute_centered_kernel_matrix_regulirized_manually_2(X, m, lbd, intercept):
     u = np.ones(X.shape[0])
     X_del_centered = np.delete(X - np.outer(u, mean), 0, axis=1)
     return X_del_centered @ X_del_centered.T + lbd * np.eye(n)  # (n, n)
+
+
+def plot2D(X, M, extra_info):
+#    plt.scatter(X[:, 0], X[:, 1])
+#    plt.scatter(X[M[:, 0] == 1, 0], X[M[:, 0] == 1, 1])
+#    plt.scatter(X[M[:, 1] == 1, 0], X[M[:, 1] == 1, 1])
+    # Base points
+    plt.scatter(X[:, 0], X[:, 1], label="All points")
+
+    # Group 1
+    plt.scatter(
+        X[M[:, 0] == 1, 0],
+        X[M[:, 0] == 1, 1],
+        label="1st component missing"
+    )
+
+    # Group 2
+    plt.scatter(
+        X[M[:, 1] == 1, 0],
+        X[M[:, 1] == 1, 1],
+        label="2nd component missing"
+    )
+    text1 = "p_value E-test " + f"{extra_info['current_p_value']:.2f}"
+    text1 = text1 + extra_info['extra_text'] if 'extra_text' in extra_info.keys() else text1
+    # Add text somewhere in the figure
+    plt.text(
+        0.05, 0.95,              # position
+        text1,              # text content
+        transform=plt.gca().transAxes,  # coordinates relative to axes
+        fontsize=12,
+        verticalalignment='top'
+    )
+
+    # Axis labels and title (optional)
+    plt.xlabel("X1")
+    plt.ylabel("X2")
+    plt.title("2D Scatter Plot")
+
+    # Show legend
+    plt.legend(loc="lower right", bbox_to_anchor=(1, 0))
+
+
+    plt.show()
 
 

@@ -2,10 +2,9 @@ import numpy as np
 import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
-from tsp import gibb_sampl_no_modification, gibb_sampl_over_parametrized, gibb_sampl_under_parametrized
 from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling, gibb_sampl_fast_sampling
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
-from utils import make_centered_kernel_matrix, update_inverse_rk2_sym
+from utils import make_centered_kernel_matrix, update_inverse_rk2_sym, plot2D
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import Ridge 
@@ -223,169 +222,6 @@ def test_impute_matrix_under_parametrized():
     print("test impute matrix ended successfully\n\n")
 
 
-def test_gibb_sampl_no_modification():
-    print("\n\nbeginning test gibb samp no modification\n")
-    n = 7
-    #print("sqrt n ", np.sqrt(n))
-    #rint("n ** (3/4)", n ** (3/4))
-    #print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 3
-    lbd = 1 + 0.0
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    #X_orig = np.random.rand(n, d) + 0.0
-    print("gibb sampl no modification ", X_orig.dtype)
-    print("max min ")
-    mean = np.mean(X_orig, axis=0)
-    std = np.std(X_orig, axis=0)
-    # Standardize
-    #X = (X_orig - mean) / std
-    X = X_orig
-    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    #print(np.max(X))
-    #print(np.min(X))
-    #M = np.random.binomial(1, 0.01, size=(n, d))
-    exponent = (n ** (3/4)) / n
-    #print("exponent", exponent)
-    M = generate_mask_with_bounded_flip(n=n, d=d, p_miss=0.4, p_flip=exponent)
-    #print("masks in test gibb sampl no modification\n", M)
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    R = 2
-    info_dic = {
-        'data': X,
-        'masks': M,
-        'nbr_it_gibb_sampl': R,
-        'lbd_reg': lbd,
-        'tsp': False,
-        'recomputation': False,
-        'batch_size': 64,
-        'verbose': 0
-    }
-    res = gibb_sampl_no_modification(info_dic)
-    print("test gibb sampl no modif ended successfully\n\n")
-
-
-def test_gibb_sampl_under_parametrized():
-    # the test consists in running IterativeImputer with Ridge Regression,
-    # and our handmade gibb sampling function
-    print("test gibb sampl under parametr started")
-    n = 240
-    print("sqrt n ", np.sqrt(n))
-    print("n ** (3/4)", n ** (3/4))
-    print("n ** (3/4) / n", (n ** (3/4)) / n)
-    d = 25
-    lbd = 1 + 0.0
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    X_orig = np.random.rand(n, d) + 0.0
-    print(X_orig.dtype)
-    print("max min ")
-    mean = np.mean(X_orig, axis=0)
-    std = np.std(X_orig, axis=0)
-    # Standardize
-    X = (X_orig - mean) / std
-    X = X_orig
-    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
-    M = np.random.binomial(1, 0.1, size=(n, d))
-    #exponent = (n ** (3/4)) / n
-    #print("exponent", exponent)
-    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    R = 4
-    info_dic = {
-        'data': X,
-        'masks': M,
-        'nbr_it_gibb_sampl': R,
-        'lbd_reg': lbd,
-        'tsp': False,
-        'recomputation': False,
-        'batch_size': 64,
-        'verbose': 0,
-        'initial_strategy': 'constant',
-        'exponent_d': 0.75
-    }
-    start_time_gibb_sampl = time.time()
-    X_my = gibb_sampl_under_parametrized(info_dic)
-    end_time_gibb_sampl = time.time()
-    print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
-#    print(X_my) 
-    print("\nend my gibb sampling\n")
-    
-    print("It imputer Ridge Reg")
-    ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
-    start4 = time.time()   # tic
-    res4 = ice4.fit_transform(X_nan)
-#    print("result IterativeImptuer with Ridge\n", res4)
-    end4 = time.time()     # toc
-    print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-    #if not info_dic['tsp']:
-    np.testing.assert_allclose(X_my, res4)
-    print("test gibb sampl under parametr ended successfully\n")
-
-
-def test_gibb_sampl_over_parametrized():
-    print("\ntest gibb sample over parametr started")
-    n = 39
-    d = 55
-    lbd = 1.6321 + 0.0
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    #X_orig = np.random.rand(n, d) + 0.0
-    #print(X_orig.dtype)
-    #print("max min ")
-    mean = np.mean(X_orig, axis=0)
-    std = np.std(X_orig, axis=0)
-    # Standardize
-    #X = (X_orig - mean) / std
-    X = X_orig
-    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    print(np.max(X))
-    print(np.min(X))
-    M = np.random.binomial(1, 0.5, size=(n, d))
-    for ii in range(d):
-        nbr = np.random.randint(0, n)
-        #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
-        if np.sum(M[:, ii]) == n:
-            print("add a random seen component")
-            M[nbr, ii] = 0
-    exponent = (n ** (3/4)) / n
-    #M[-1, 0] = 0
-    #print("exponent", exponent)
-    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.2, p_flip=exponent)
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    #print(X_nan)
-    R = 2
-    info_dic = {
-        'data': X,
-        'masks': M,
-        'nbr_it_gibb_sampl': R,
-        'lbd_reg': lbd,
-        'tsp': False,
-        'recomputation': False,
-        'batch_size': 64,
-        'verbose': 0,
-        'initial_strategy': 'mean',
-        'exponent_d': 0.75
-    }
-    res = gibb_sampl_over_parametrized(info_dic)
-    #res_std = gibb_sampl(info_dic)
-    #print("final res_std\n", res_std)
-    #print("final res\n", res)
-    #np.testing.assert_allclose(res, res_std)
-
-    print("It imputer Ridge Reg")
-    ice_skl = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
-    res_skl = ice_skl.fit_transform(X_nan)
-    np.testing.assert_allclose(res, res_skl)
-    print("check skl vs my under parametrized passed successfully")
-    print("test gibb sample over parametr ended successfully")
-
-
 def test_gibb_sampling_over_parametrized_sampling():
     # no sampling, check against ridge regression with intercept
     print("test gibb sampling OVERPARAMETRIZED SAMPLING began")
@@ -583,7 +419,6 @@ test_gibb_sampling_fast_sampling()
 print("pause: input()")
 
 test_gibb_sampl_under_parametrized_sampling()
-test_gibb_sampl_over_parametrized()
 test_gibb_sampling_over_parametrized_sampling()
 
 
@@ -596,16 +431,5 @@ test_split_upd()
 test_s()
 test_rk_1_update_inverse()
 test_impute_matrix_under_parametrized()
-test_gibb_sampl_no_modification()
-test_gibb_sampl_under_parametrized()
-test_gibb_sampl_over_parametrized()
 test_gibb_sampling_over_parametrized_sampling()
-
-
-
-
-
-
-
-
 
