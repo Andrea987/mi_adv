@@ -236,11 +236,11 @@ def test_gibb_sampling_over_parametrized_sampling():
     X_orig = np.random.multivariate_normal(mean, cov, size=n)
     #print(X_orig.dtype)
     #print("max min ")
-    #mean = np.mean(X_orig, axis=0)
-    #std = np.std(X_orig, axis=0)
+    mean = np.mean(X_orig, axis=0)
+    std = np.std(X_orig, axis=0)
     # Standardize
-    #X = (X_orig - mean) / std
-    X = X_orig
+    X = (X_orig - mean) / std
+    #X = X_orig
     #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     M = np.random.binomial(1, 0.5, size=(n, d))
     for ii in range(d):
@@ -298,7 +298,7 @@ def test_gibb_sampling_over_parametrized_sampling():
 
 def test_gibb_sampl_under_parametrized_sampling():
     # no sampling, check against ridge regression with intercept
-    print("test gibb sampling udnerparametrized_sampling began")
+    print("test GIBB SAMPLING UNDER_PARAMETRIZED udnerparametrized_sampling began")
     n, d = 100, 7
     lbd = 0.321096 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
@@ -337,6 +337,7 @@ def test_gibb_sampl_under_parametrized_sampling():
         'data': X,
         'masks': M,
         'nbr_it_gibb_sampl': R,
+        'imputed_data': None,
         'lbd_reg': lbd,
         'tsp': False,
         'recomputation': False,
@@ -415,6 +416,16 @@ def test_gibb_sampling_fast_sampling():
 
 
 
+test_flip_matrix()
+test_split_upd()
+test_swm()
+test_split_upd()
+test_s()
+test_rk_1_update_inverse()
+test_impute_matrix_under_parametrized()
+test_gibb_sampling_over_parametrized_sampling()
+
+
 test_gibb_sampling_fast_sampling()
 print("pause: input()")
 
@@ -432,4 +443,6 @@ test_s()
 test_rk_1_update_inverse()
 test_impute_matrix_under_parametrized()
 test_gibb_sampling_over_parametrized_sampling()
+
+
 

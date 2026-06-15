@@ -1,0 +1,178 @@
+def gibb_sampl_under_parametrized(info):
+    # flip matrix
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample under param \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
+    #b_s = 5
+    #print("who is X in gibb sampl \n", X)
+    #ones = np.ones((d, d)) 
+    #start_algo_gibb_s_partial = time.time()
+    #s = np.ones_like(M.T)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix masks: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    #start_algo_gibb_s_partial = time.time()
+    #s = np.ones_like(M.T)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix, M: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    #start_algo_gibb_s_partial_sparse = time.time()
+    #M_s = csr_matrix(M)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+    #print("type flip matrix ", type(F))
+    #print("flip matrix head\n" , F[0:8, 0:8])
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial_sparse = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix, M sparse: {end_algo_gibb_s_partial_sparse - start_algo_gibb_s_partial_sparse:.4f} seconds\n\n")
+    
+    #print("flip matrix\n", F)
+    if info['tsp']:
+        start_time = time.time()
+        MM = M if np.mean(M) >= 1/2 else 1 - M
+        M_s = csr_matrix(MM)
+        ones_d = np.ones(d)
+        #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+        #M_ss = csr_matrix(M)
+        F = np.outer(ones_d, np.sum(MM, axis=0)) + np.outer(np.sum(MM.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+        #FF = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_ss.T @ M_ss
+        #np.testing.assert_allclose(F, FF)
+        #permutation, distance = solve_tsp_local_search(F)
+        permutation, distance = serialization_first_idea(F)
+        current_distance = distance
+        current_permutation = permutation
+        
+        original_cost = np.sum(np.diag(F, k=1))
+        print("original cost in tsp", original_cost)
+        #print("optimal perm ", permutation, "optimal dist ", distance) 
+        distances = []
+        distances.append(distance)
+        s = int(np.floor(np.sqrt(d)))
+        for i in range(s):
+            permutation, distance = serialization_first_idea(F)
+            distances.append(distance)
+            if distance < current_distance:
+                current_distance = distance
+                current_permutation = permutation
+        M = M[:, current_permutation]
+        X = X[:, current_permutation]
+        print("distances tsp ", np.array(distances))
+        end_time = time.time()
+        print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+
+    #print("exponent d ", info['exponent_d'])
+    #print("\n", X)
+    #print("\n", M)
+    Ms = matrix_switches(M)
+    first_mask = M[:, 0]
+    #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    R = X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    start_gibb_s = time.time()
+    Rt_R = R.T @ R + lbd * np.eye(d)
+    Q = np.linalg.inv(Rt_R)
+    counter_upd_dwd = 0
+    counter_recomputation = 0
+    counter_swm_formula = 0 
+    counter_reinversion = 0
+    print("d ** exp: ", d ** info['exponent_d'])
+    for h in range(r):
+        for i in range(d):
+            #print("index ", i)
+            X, _ = impute_matrix_under_parametrized(X, Q, M, i)
+            #print("round ", i, "who is X gs\n", X)
+            #v = X.T @ X[:, i]
+            #Rt_R[i, :] = v
+            #Rt_R[:, i] = v
+            #Rt_R
+            #print("who is Rt_R \n", Rt_R)
+            if h < r-1 or i < d-1:
+                N = Ms[:, i]
+                X_upd, X_dwd = split_upd(X, N)
+                #print(N)
+                #print("sequence of print")
+                if info['verbose'] > 0:
+                    print(X)
+                #print(X_upd)
+                #print(X_dwd)
+                nupd, _ = X_upd.shape
+                ndwd, _ = X_dwd.shape
+                '''
+                if nupd + ndwd > n:
+                    idx = i+1 if i<d-1 else 0
+                    print(idx)
+                    R = X[M[:, idx] == 0, :]
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                '''
+                idx = i+1 if i<d-1 else 0
+                #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
+                if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
+                    #print("recompute the matrix with the missing components")
+                    counter_recomputation = counter_recomputation + 1
+                    R = X[M[:, idx] == 0, :]
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+
+                else:
+                    counter_upd_dwd = counter_upd_dwd + 1
+                    #print("update the covariance matrix") 
+                    Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #RR = X[M[:, idx] == 0, :]
+                    #Rt_RR = RR.T @ RR + lbd * np.eye(d)
+                    #np.testing.assert_allclose(Rt_R, Rt_RR)
+                if nupd + ndwd > d ** info['exponent_d']:
+                    #print("invert the matrix")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    #idx = i+1 if i<d-1 else 0
+                    #print(idx)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    #Rt_R = R.T @ R + lbd * np.eye(d)
+                    counter_reinversion = counter_reinversion + 1
+                    Q = np.linalg.inv(Rt_R)
+                else:
+                    counter_swm_formula = counter_swm_formula + 1
+                    #print("low rank upd of the inverse")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    Q = swm_formula(Q, X_upd.T, 1.0)
+                    Q = swm_formula(Q, X_dwd.T, -1.0)
+                    #for i_up in range(nupd):
+                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+                    #for i_dw in range(ndwd):
+                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
+                    #print("QQ\n ", QQ)
+                    #print("Q\n", Q)
+                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+    end_gibb_s = time.time()
+    print("counter recomp ", counter_recomputation/r)
+    print("counter upd dwd ", counter_upd_dwd/r)
+    print("counter reinv", counter_reinversion/r)
+    print("counter swm ", counter_swm_formula/r)
+    #print("res my imp \n", X)
+    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    return X

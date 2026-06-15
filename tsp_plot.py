@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import copy
-from tsp import gibb_sampl, gibb_sampl_no_modification
+from tsp import gibb_sampl
 from generate import generate_mask_with_bounded_flip, generate_masks_mnar
 from sklearn.linear_model import Ridge
 from sklearn.impute import SimpleImputer
@@ -113,7 +113,7 @@ def plot_some_graph():
 
             start_baseline = time.time()   # tic
             #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
-            X_my_baseline = gibb_sampl_no_modification(info_dic)  
+            #X_my_baseline = gibb_sampl_no_modification(info_dic)  
             # print("result IterativeImptuer with Ridge\n", res4)
             end_baseline = time.time()     # toc
             total_time_baseline[j, i] = end_baseline - start_baseline

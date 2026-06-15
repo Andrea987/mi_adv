@@ -207,12 +207,12 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
     #mmean = np.mean(X, axis=0)
     #S = X.T @ X - n * np.outer(mmean, mmean) + 1.1 * np.eye(d)
     n, d = X.shape
-    xi = X[:, i]
+    #xi = X[:, i]
     X_i = np.delete(X, i, axis=1)
     Q_i = np.delete(Q, i, axis=0)
-    S_i = np.delete(S, i, axis=1)
+    #S_i = np.delete(S, i, axis=1)
     mu_i = np.delete(mu, i, axis=0)
-    v = np.zeros(d-1)
+    #v = np.zeros(d-1)
     v = -(1 / Q[i, i]) * Q_i[:, i]
 
     #check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
@@ -220,7 +220,9 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
     S_current = 1 / Q[i, i]
     #print("S_current ", S_current, "S_current_check ", S_current_check)
     u = np.ones(n)
-    prediction = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
+    #prediction1 = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
+    prediction = mu[i] + X_i @ v[:, None] - np.sum(mu_i * v)
+    #np.testing.assert_allclose(prediction, prediction1)
 
     prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
     
@@ -248,8 +250,8 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
     K_inv_MS = K_inv[m == 1][:, m == 0]  # (n_m, n_s)
     if K_inv_MS.ndim == 1:
         K_inv_MS = np.array([K_inv_MS])
-    if n_m * 10000000 < n_s:  # not many missing components 
-        print("less miss components that seen")
+    if n_m < n_s:  # not many missing components 
+        #print("less miss components that seen")
         #print("n_m < n_s")
         #print("M \n", M)
         #X_del = np.delete(X, idx, axis=1)
@@ -267,10 +269,10 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
         #print("A\n", A)
         
         #print("X_s ", X_s)
-        print(mean_idx)
+        #print(mean_idx)
         #x = mean_idx - np.linalg.solve(S_C, A @ (X_s - mean_idx)) 
-        x = mean_idx - np.linalg.solve(K_inv_MM, K_inv_MS @ (X_s - mean_idx))  #
-        print("predicitons ", x)  
+        x = mean_idx - np.linalg.solve(K_inv_MM, K_inv_MS @ (X_s - mean_idx))  
+        #print("predicitons ", x)  
 
         #K_SS = K[m == 0, :][:, m == 0]  # submatrix of regulirized seen components
         #K_MS = K[m == 1, :][:, m == 0]
@@ -290,7 +292,7 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
         K_MS = K[m == 1, :][:, m == 0]
         Xss = X_s - mean_idx
         x1 = np.linalg.solve(K_SS, Xss)
-        K_S_not_reg = K_SS - np.eye(n_s) * lbd
+        K_S_not_reg = K_SS - np.eye(int(n_s)) * lbd
         mean_i_given_rest = mean_idx + K_MS @ x1
         cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
         x = mean_i_given_rest
@@ -300,12 +302,12 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
         #np.testing.assert_allclose(x, prediction1.squeeze())
 
     if sampling and n_m>0:
-        print("you are sampling")
+        #print("you are sampling")
         #print("K\n ", K)  # K is the regularize centered kernel matrix
         if cov_i_given_rest is None:
             K_SS = K[m == 0, :][:, m == 0]  # submatrix of seen components
             Xss = X_s - mean_idx
-            print("test variacen ", np.sum(Xss * Xss))
+            #print("test variacen ", np.sum(Xss * Xss))
             #print("Xss ", Xss)
             x1 = np.linalg.solve(K_SS, Xss)
             K_S_not_reg = K_SS - np.eye(n_s) * lbd

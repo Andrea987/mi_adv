@@ -85,6 +85,7 @@ def plot2D_gaussian():
     extra_info = {'current_stat': stat, 'current_p_value': pvalue}
     plot2D(res, M, extra_info)
     RR = 6
+    pvalue_list = []
     for i in range(RR):
         res = gibb_sampl_under_parametrized_sampling(info_dic)
         info_dic['imputed_data'] = res
@@ -92,6 +93,7 @@ def plot2D_gaussian():
         print("stat ", stat , "pvalue ", pvalue)
         extra_info = {'current_stat': stat, 'current_p_value': pvalue}
         print("iterat ", i)
+        pvalue_list.append(pvalue)
         plot2D(res, M, extra_info)
 
 

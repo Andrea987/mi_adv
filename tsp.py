@@ -18,6 +18,7 @@ from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_over_
 from utils import flip_matrix_manual, update_inverse_rk2_sym, matrix_switches, swm_formula, split_upd, split_up_fx_dw, update_covariance
 from utils import s as s_prod
 from utils import make_centered_kernel_matrix, plot2D, compute_centered_kernel_matrix_regulirized_manually, compute_centered_kernel_matrix_regulirized_manually_2
+from utils import swm_formula_asymmetric
 from serialization import serialization_first_idea
 import copy
 from hyppo.ksample import Energy
@@ -142,10 +143,10 @@ def gibb_sampl_fast_sampling(info):
 def gibb_sampl_under_parametrized_sampling(info):
     # flip matrix
     #if info['ml_or_bs'] not in ['bayesian', 'max_lh']:
-    #    print("please specify a correct approach, bayesian or max_lh")
-    #    input()
+    #print("please specify a correct approach, bayesian or max_lh")
+    #input()
     X = info['data']
-    original_X = X
+    #original_X = X
     M = info['masks']
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
@@ -155,7 +156,7 @@ def gibb_sampl_under_parametrized_sampling(info):
     X_nan[M==1] = np.nan
     initial_imputation = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
     X = initial_imputation.fit_transform(X_nan) if info['imputed_data'] is None else info['imputed_data']
-    print(X)
+    #print(X)
     #plot2D(X, M) if info['plot2D_it'] else print("no 2D plot")
     #print("simple imputer in gibb sample under param \n", X)
     #print("shape M", M.shape)
@@ -208,7 +209,9 @@ def gibb_sampl_under_parametrized_sampling(info):
     R = X[first_mask == 0, :]
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
-    start_gibb_s = time.time()
+    
+    #start_gibb_s = time.time()
+    
     mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1])
     u = np.ones(R.shape[0])
     #print(a)
@@ -217,20 +220,23 @@ def gibb_sampl_under_parametrized_sampling(info):
     #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1/R_centered.shape[0] 
     #print("alpha ", alpha)
     Cov = R_centered.T @ R_centered + lbd * np.eye(d)  ## look how to add the (1/n), where it is better to be added 
+    #start_inner1 =time.time()
     Q = np.linalg.inv(Cov)
-    current_info ={
-        'inverse': Q,
-        'vectors': R
-    } 
+    #end_inner1 = time.time() - start_inner1
+    #print("time first inversion ", end_inner1)
+    #current_info ={
+    #    'inverse': Q,
+    #    'vectors': R
+    #} 
     counter_upd_dwd = 0
     counter_recomputation = 0
     counter_swm_formula = 0 
     counter_reinversion = 0
-    old_X = X
+    #old_X = X
     print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
-        print("\n\n CURRENT ITERATION GIBBS SANMPLING IN UNDERPARAMETRIZED SAMPLING ", h, "\n")
-        old_X = X
+        #print("\n\n CURRENT ITERATION GIBBS SANMPLING IN UNDERPARAMETRIZED SAMPLING ", h, "\n")
+        #old_X = X
         #diff = np.sum((X - old_X)**2)
         #stat, pvalue = Energy().test(original_X, old_X)
         #print("stat ", stat , "pvalue ", pvalue)
@@ -244,9 +250,11 @@ def gibb_sampl_under_parametrized_sampling(info):
         #print("\ndifference old vs new \n", np.sqrt(diff))
         #plot2D(X, M) if original_X.shape[1] == 2 else print("dimension too high, no 2D plot")
         for i in range(d):
+            start = time.time()
             #alpha = R_centered.shape[0] if info['ml_or_bs'] == 'bayesian' else 1
             alpha = R_centered.shape[0]  # we need to correct by this alpha to get a correct imputation
             X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i, sampling, intercept)
+            #X, _ = impute_matrix_under_parametrized(X, Q, M, i)  #  faster
             #print("stopppp")
             #input()
             #print("round ", i, "who is X gs\n", X)
@@ -258,7 +266,7 @@ def gibb_sampl_under_parametrized_sampling(info):
             if h < r-1 or i < d-1:
                 N = Ms[:, i]
                 #print("flip vector ", N)
-                X_up, X_fx, X_dw = split_up_fx_dw(X, N)  # observe, in the fix there are also vector that were not present in neither of masks, i.e rows with (1, 1)
+                X_up, X_dw = split_upd(X, N)  # observe, in the fix there are also vector that were not present in neither of masks, i.e rows with (1, 1)
                 #print(N)
                 #print("sequence of print")
                 #if info['verbose'] > 0:
@@ -266,7 +274,7 @@ def gibb_sampl_under_parametrized_sampling(info):
                 #print(X_upd)
                 #print(X_dwd)
                 nup, _ = X_up.shape
-                nfx, _ = X_fx.shape
+                #nfx, _ = X_fx.shape
                 ndw, _ = X_dw.shape
                 #ns = nfx + nup
                 #print(nfx + nup + ndw)
@@ -293,17 +301,23 @@ def gibb_sampl_under_parametrized_sampling(info):
                 #print("ns true ", R.shape[0])
                 old_mean = mean #if intercept else np.zeros(R.shape[1])
                 mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1]) # new mean
-                old_R_centered = R_centered
+                #old_R_centered = R_centered
                 u = np.ones(R.shape[0])
-                R_centered = R - np.outer(u, mean)
+                
+                old_mean_rescaled = np.sqrt(ns_old) * old_mean #if info['ml_or_bs'] == 'bayesian' else old_mean 
+                mean_rescaled = np.sqrt(ns) * mean #if info['ml_or_bs'] == 'bayesian' else mean
+                X_up_ext = np.vstack((X_up, old_mean_rescaled))
+                X_dw_ext = np.vstack((X_dw, mean_rescaled))
+                
                 if ns < nup + ndw:  # if nbr seen component is less than nbr of flips
-                    print("recompute the matrix with the missing components")
+                    #print("recompute the matrix with the missing components")
                     counter_recomputation = counter_recomputation + 1
                     #mean = np.mean(R, axis=0)
                     u = np.ones(R.shape[0])
                     #print(a)
                     #print("\n", np.outer(u, a))
                     #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1 / R_centered.shape[0]
+                    R_centered = R - np.outer(u, mean)
                     Cov = R_centered.T @ R_centered + lbd * np.eye(d)
                     #Rt_R = R.T @ R + lbd * np.eye(d)
                     #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
@@ -312,13 +326,15 @@ def gibb_sampl_under_parametrized_sampling(info):
                     #print("update the covariance matrix") 
                     #old_mean = mea
                     #mean = np.mean(R, axis=0)
-                    old_Cov = Cov
-                    Cov = Cov + np.outer(old_mean, old_mean) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw - np.outer(mean, mean) * ns
-                    Cov_test = R_centered.T @ R_centered + lbd * np.eye(d)
+                    #old_Cov = Cov
+                    #Cov = Cov + np.outer(old_mean, old_mean) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw - np.outer(mean, mean) * ns
+                    Cov = Cov + X_up_ext.T @ X_up_ext - X_dw_ext.T @ X_dw_ext
+                    #print("        cond numb cov in tsp ", np.linalg.cond(Cov), "it: i ", i)
+                    #Cov_test = R_centered.T @ R_centered + lbd * np.eye(d)
                     #np.testing.assert_allclose(Cov_test, Cov)
                     #Cov = ((Cov - lbd * np.eye(d) + np.outer(old_mean, old_mean)) * ns_old + X_up.T @ X_up - X_dw.T @ X_dw) / ns - np.outer(mean, mean) + lbd * np.eye(d)
                 if  nup + ndw > d ** info['exponent_d']:
-                    print("invert the matrix")
+                    #print("invert the matrix")
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #idx = i+1 if i<d-1 else 0
                     #print(idx)
@@ -329,18 +345,22 @@ def gibb_sampl_under_parametrized_sampling(info):
                     counter_reinversion = counter_reinversion + 1
                     Q = np.linalg.inv(Cov)
                 else:
+                    #print("upd + dwd ", nup + ndw, " ", ns, "iteration: i ", i)
                     counter_swm_formula = counter_swm_formula + 1
-                    print("low rank upd of the inverse")
+                    #print("low rank upd of the inverse")
                     #print("approach: ", info['ml_or_bs'])
                     #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
                     #alpha = 1 if info['ml_or_bs'] == 'bayesian' else 1 / R_centered.shape[0]
-                    old_mean_rescaled = np.sqrt(ns_old) * old_mean #if info['ml_or_bs'] == 'bayesian' else old_mean 
-                    mean_rescaled = np.sqrt(ns) * mean #if info['ml_or_bs'] == 'bayesian' else mean
+                    #old_mean_rescaled = np.sqrt(ns_old) * old_mean #if info['ml_or_bs'] == 'bayesian' else old_mean 
+                    #mean_rescaled = np.sqrt(ns) * mean #if info['ml_or_bs'] == 'bayesian' else mean
                     #old_mean_rescaled = np.sqrt(ns_old) * old_mean 
                     #mean_rescaled = np.sqrt(ns) * mean
-                    X_up_ext = np.vstack((X_up, old_mean_rescaled))
-                    X_dw_ext = np.vstack((X_dw, mean_rescaled))
-
+                    #time.sleep(1)
+                    #start_inner =time.time()
+                    #time.sleep(2)
+                    #X_up_ext = np.vstack((X_up, old_mean_rescaled))
+                    #X_dw_ext = np.vstack((X_dw, mean_rescaled))
+                   
                     #QQ = swm_formula(Q, old_mean_rescaled, 1.0)
                     #QQ_test = np.linalg.inv(old_R.T @ old_R + np.eye(d) * lbd)
                     #print("QQ_inv\n ", QQ)
@@ -357,9 +377,29 @@ def gibb_sampl_under_parametrized_sampling(info):
                     #print("\n\nQQQQ_inv\n ", QQQQ)
                     #print("QQQQ_test_inv \n", QQQQ_test)
 
-
+                    #QQQ = Q
+                    #print(np.linalg.cond(Q))
+                    #print(np.max(X_up_ext))
                     Q = swm_formula(Q, X_up_ext.T, 1.0)
                     Q = swm_formula(Q, X_dw_ext.T, -1.0)
+                    
+                    #print(X_up_ext)
+                    #print(X_dw_ext)
+                    
+                    #UU = np.vstack([X_up_ext, -X_dw_ext])  
+                    #VV = np.vstack([X_up_ext, X_dw_ext])  
+                    
+                    #print("ciaooooo\n", VV)
+                    #print("ciaooooo2222\n", UU)
+                    
+                    #Q = swm_formula_asymmetric(Q, VV.T, UU.T, 1.0) 
+                    
+                    #print("ciaouweyewyuwy")
+                    #print(Q)
+                    #print(QQ)
+                    #print("ciaoewjekwj")
+                    #inner_elapsed = time.time() - start_inner
+                    #print("inner elapsed ", inner_elapsed)
                     #Q_test = np.linalg.inv(Cov)
 
                     #print("Q_inv\n ", Q)
@@ -373,17 +413,21 @@ def gibb_sampl_under_parametrized_sampling(info):
                     #print("QQ\n ", QQ)
                     #print("Q\n", Q)
                     #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
-    end_gibb_s = time.time()
+            #end = time.time() - start
+            #print("final time one iter: ", end)
+    #end_gibb_s = time.time()
     #stat, pvalue = Energy().test(original_X, old_X)
     #print("stat ", stat , "pvalue ", pvalue)
     #extra_info = {'current_stat': stat, 'current_p_value': pvalue}
     #plot2D(X, M, extra_info) if info['plot2D_it'] else print("no 2D plot")
-    print("counter recomp ", counter_recomputation/r)
-    print("counter upd dwd ", counter_upd_dwd/r)
-    print("counter reinv", counter_reinversion/r)
-    print("counter swm ", counter_swm_formula/r)
+    #print("counter recomp ", counter_recomputation/r)
+    #print("counter upd dwd ", counter_upd_dwd/r)
+    #print("counter reinv", counter_reinversion/r)
+    #print("counter swm ", counter_swm_formula/r)
     #print("res my imp \n", X)
-    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    #start_gibb_s = 1
+    #end_gibb_s = 2
+    #print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
     return X
 
 
@@ -395,7 +439,7 @@ def gibb_sampl_over_parametrized_sampling(info):
     M_original = M.copy()
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
-    print("\nintercept: ", intercept, "\n\n")
+    #print("\nintercept: ", intercept, "\n\n")
     X_nan = X.copy()
     original_X = X.copy()
     X_nan[M==1] = np.nan
@@ -414,10 +458,10 @@ def gibb_sampl_over_parametrized_sampling(info):
     #np.testing.assert_allclose(K_centered_reg, K_centered_test2)
     K_centered_reg_inv = np.linalg.inv(K_centered_reg)
     for h in range(nbr_it_gs):
-        print("\n\n CURRENT ITERATION GIBBS SANMPLING OVER PARAMETRIZED", h, "\n")
-        old_X = X
-        stat, pvalue = Energy().test(original_X, old_X)
-        print("stat ", stat , "p value ", pvalue)
+        #print("\n\n CURRENT ITERATION GIBBS SANMPLING OVER PARAMETRIZED", h, "\n")
+        #old_X = X
+        #stat, pvalue = Energy().test(original_X, old_X)
+        #print("stat ", stat , "p value ", pvalue)
         #diff = np.sum((X - old_X)**2)
         #stat, pvalue = Energy().test(original_X, old_X)
         #print("stat ", stat , "p value ", pvalue)
@@ -434,6 +478,7 @@ def gibb_sampl_over_parametrized_sampling(info):
                 v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
                 current_mask = M[:,(i+1)] if i<d-1 else M[:, 0]
                 
+                
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_add, 1.0)
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, v_to_remove, -1.0)
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, u * np.sqrt(m_K_m), -1.0)
@@ -447,6 +492,7 @@ def gibb_sampl_over_parametrized_sampling(info):
 
                 K_centered_reg_inv = swm_formula(K_centered_reg_inv, u * np.sqrt(m_K_m), 1.0)
                 K_centered_reg_inv = update_inverse_rk2_sym(K_centered_reg_inv, U)
+
 
                 #K_centered_reg_test2 = compute_centered_kernel_matrix_regulirized_manually(K, current_mask, lbd)
                 #K_centered_reg_test2_inv = np.linalg.inv(K_centered_reg_test2)
@@ -622,5 +668,240 @@ def test_gibb_sampl_over_parametrized_sampling():
     #ice4 = IterativeImputer(estimator=Ridge(fit_intercept=False, alpha=lbd), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
     #start4 = time.time()   # tic
     #res4 = ice4.fit_transform(X_nan)
+
+
+def gibb_sampl_sampling(info):
+    ## both versiona of the sampler are in this function
+    X = info['data']
+    n, d = X.shape
+    return gibb_sampl_under_parametrized_sampling(info) if n>=d else gibb_sampl_over_parametrized_sampling(info)
+
+
+
+
+''''extra, to cancel later'''
+
+def gibb_sampl_under_parametrized(info):
+    # flip matrix
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample under param \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = 10
+    #b_s = 5
+    #print("who is X in gibb sampl \n", X)
+    #ones = np.ones((d, d)) 
+    #start_algo_gibb_s_partial = time.time()
+    #s = np.ones_like(M.T)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #FF = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix masks: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    #start_algo_gibb_s_partial = time.time()
+    #s = np.ones_like(M.T)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M.T @ M
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix, M: {end_algo_gibb_s_partial - start_algo_gibb_s_partial:.4f} seconds\n\n")
+    #start_algo_gibb_s_partial_sparse = time.time()
+    #M_s = csr_matrix(M)
+    #ones_d = np.ones(d)
+    #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+    #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+    #print("type flip matrix ", type(F))
+    #print("flip matrix head\n" , F[0:8, 0:8])
+    #np.testing.assert_allclose(F, FF)
+    #end_algo_gibb_s_partial_sparse = time.time()
+    #print(f"Elapsed time gibb sampl, cov matrix, M sparse: {end_algo_gibb_s_partial_sparse - start_algo_gibb_s_partial_sparse:.4f} seconds\n\n")
+    
+    #print("flip matrix\n", F)
+    if info['tsp']:
+        start_time = time.time()
+        MM = M if np.mean(M) >= 1/2 else 1 - M
+        M_s = csr_matrix(MM)
+        ones_d = np.ones(d)
+        #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
+        #M_ss = csr_matrix(M)
+        F = np.outer(ones_d, np.sum(MM, axis=0)) + np.outer(np.sum(MM.T, axis=1), ones_d) - 2 * M_s.T @ M_s
+        #FF = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_ss.T @ M_ss
+        #np.testing.assert_allclose(F, FF)
+        #permutation, distance = solve_tsp_local_search(F)
+        permutation, distance = serialization_first_idea(F)
+        current_distance = distance
+        current_permutation = permutation
+        
+        original_cost = np.sum(np.diag(F, k=1))
+        print("original cost in tsp", original_cost)
+        #print("optimal perm ", permutation, "optimal dist ", distance) 
+        distances = []
+        distances.append(distance)
+        s = int(np.floor(np.sqrt(d)))
+        for i in range(s):
+            permutation, distance = serialization_first_idea(F)
+            distances.append(distance)
+            if distance < current_distance:
+                current_distance = distance
+                current_permutation = permutation
+        M = M[:, current_permutation]
+        X = X[:, current_permutation]
+        print("distances tsp ", np.array(distances))
+        end_time = time.time()
+        print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
+
+    #print("exponent d ", info['exponent_d'])
+    #print("\n", X)
+    #print("\n", M)
+    Ms = matrix_switches(M)
+    first_mask = M[:, 0]
+    #print("\n ", first_mask)
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    R = X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    start_gibb_s = time.time()
+    Rt_R = R.T @ R + lbd * np.eye(d)
+    Q = np.linalg.inv(Rt_R)
+    counter_upd_dwd = 0
+    counter_recomputation = 0
+    counter_swm_formula = 0 
+    counter_reinversion = 0
+    print("d ** exp: ", d ** info['exponent_d'])
+    for h in range(r):
+        for i in range(d):
+            #print("index ", i)
+            X, _ = impute_matrix_under_parametrized(X, Q, M, i)
+            #print("round ", i, "who is X gs\n", X)
+            #v = X.T @ X[:, i]
+            #Rt_R[i, :] = v
+            #Rt_R[:, i] = v
+            #Rt_R
+            #print("who is Rt_R \n", Rt_R)
+            if h < r-1 or i < d-1:
+                N = Ms[:, i]
+                X_upd, X_dwd = split_upd(X, N)
+                #print(N)
+                #print("sequence of print")
+                if info['verbose'] > 0:
+                    print(X)
+                #print(X_upd)
+                #print(X_dwd)
+                nupd, _ = X_upd.shape
+                ndwd, _ = X_dwd.shape
+                '''
+                if nupd + ndwd > n:
+                    idx = i+1 if i<d-1 else 0
+                    print(idx)
+                    R = X[M[:, idx] == 0, :]
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    Q = np.linalg.inv(Rt_R)
+                '''
+                idx = i+1 if i<d-1 else 0
+                #print("nbr seen ", n - np.sum(M[:, 0]), " nbr flip ", nupd + ndwd)
+                if n - np.sum(M[:, idx]) < nupd + ndwd:  # if nbr seen component is less than nbr of flips
+                    #print("recompute the matrix with the missing components")
+                    counter_recomputation = counter_recomputation + 1
+                    R = X[M[:, idx] == 0, :]
+                    Rt_R = R.T @ R + lbd * np.eye(d)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+
+                else:
+                    counter_upd_dwd = counter_upd_dwd + 1
+                    #print("update the covariance matrix") 
+                    Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #RR = X[M[:, idx] == 0, :]
+                    #Rt_RR = RR.T @ RR + lbd * np.eye(d)
+                    #np.testing.assert_allclose(Rt_R, Rt_RR)
+                if nupd + ndwd > d ** info['exponent_d']:
+                    #print("invert the matrix")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd too big, invert the matrix ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    #idx = i+1 if i<d-1 else 0
+                    #print(idx)
+                    #Rt_R = Rt_R + X_upd.T @ X_upd - X_dwd.T @ X_dwd
+                    #print("first set vct ", R)
+                    #print("first set vct shape ", R.shape)
+                    #Rt_R = R.T @ R + lbd * np.eye(d)
+                    counter_reinversion = counter_reinversion + 1
+                    Q = np.linalg.inv(Rt_R)
+                else:
+                    counter_swm_formula = counter_swm_formula + 1
+                    #print("low rank upd of the inverse")
+                    #print("nupd + nded ", nupd + ndwd, " number upd + dwd small, swm formula.          ", "nbr seen ", n - np.sum(M[:, idx]), " nbr flip ", nupd + ndwd)
+                    Q = swm_formula(Q, X_upd.T, 1.0)
+                    Q = swm_formula(Q, X_dwd.T, -1.0)
+                    #for i_up in range(nupd):
+                    #    Q = rk_1_update_inverse(Q, X_upd[i_up, :], 1.0)
+                    #for i_dw in range(ndwd):
+                    #    Q = rk_1_update_inverse(Q, X_dwd[i_dw, :], -1.0)
+                    #print("QQ\n ", QQ)
+                    #print("Q\n", Q)
+                    #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
+    end_gibb_s = time.time()
+    print("counter recomp ", counter_recomputation/r)
+    print("counter upd dwd ", counter_upd_dwd/r)
+    print("counter reinv", counter_reinversion/r)
+    print("counter swm ", counter_swm_formula/r)
+    #print("res my imp \n", X)
+    print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    return X
+
+
+
+def gibb_sampl_over_parametrized(info):
+    ## Gibb sampling in an overparametrized setting
+    X = info['data']
+    M = info['masks']
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = imp_mean.fit_transform(X_nan)
+    #print("simple imputer in gibb sample overparametrized \n", X)
+    #print("shape M", M.shape)
+    #print("nbr masks ", np.sum(M, axis=0).shape)
+    #print("nbr masks ", np.sum(M, axis=0))
+    nbr_it_gs = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape  # suppose n < d
+    X_del = np.delete(X, 0, axis=1)
+    K = X_del @ X_del.T + lbd * np.eye(n)  # (n, n)
+    K_inv = np.linalg.inv(K)
+    for h in range(nbr_it_gs):
+        for i in range(d):
+            #print("index ", i)
+            #idx = i if i<d-1 else 0
+            X = impute_matrix_overparametrized(X=X, M=M, K=K, K_inv=K_inv, lbd=lbd, idx=i)
+            #print("round ", i, ": imputed matrix gs overp\n", X)
+            if h < nbr_it_gs-1 or i < d-1:
+                v_to_add = X[:, i]
+                v_to_remove = X[:,(i+1)] if i<d-1 else X[:, 0]
+                K = K + np.outer(v_to_add, v_to_add) - np.outer(v_to_remove, v_to_remove)
+                #if i == d-1:
+                #    v_to_remove = X[:, 0]
+                K_inv = swm_formula(K_inv, v_to_add, 1.0)
+                K_inv = swm_formula(K_inv, v_to_remove, -1.0)
+    return X
+
+
+
+def gibb_sampl(info):
+    X = info['data']
+    n, d = X.shape
+    return gibb_sampl_under_parametrized(info) if n>=d else gibb_sampl_over_parametrized(info)
+
 
 

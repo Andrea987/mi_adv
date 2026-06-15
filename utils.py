@@ -2,7 +2,24 @@ import numpy as np
 from sklearn.impute import SimpleImputer
 from itertools import product
 import matplotlib.pyplot as plt
+import scipy
 
+def generate_matrix_with_bounded_flip(m, n, d, p):
+    # generate a random binary 0-1 vector m
+    new_m = np.random.binomial(1, p, size=n) if m is None else m
+    #print(new_m)
+    M = np.zeros((n, d))
+    M[:, 0] = new_m
+    for i in range(1, d):
+        flip = np.random.binomial(1, p, n)  # 0: stay the same, 1: flip
+        #print(flip, "\n")
+        new_m = flip - new_m 
+        new_m = np.abs(new_m) 
+        M[:, i] = new_m
+    #print("print M in generate matrix with bounde flip \n ", M)
+    return M
+
+generate_matrix_with_bounded_flip(None, 10, 5, 0.2)
 
 
 def generate_binary_arrays(n):
@@ -115,6 +132,45 @@ def swm_formula(Q, U, c):
     return ret
 
 
+def swm_formula_asymmetric(Q, U, V, c):
+    # sherman woodbury morrison formula
+    # compute the inverse of (Q + c * U.T @ V)ˆ(-1)
+    if U.ndim == 1 or U.shape[0] == 1 or U.shape[1] == 1:
+        print("rk 1 modification")
+        ret = rk_1_update_inverse(Q, U, c)
+    else:
+        d, m = U.shape  # U = [u_1|..|u_m], size = (d, m), # V = [v_1|..|v_m], size = (d, m)
+        #print("shape U ", d, m)
+        #print(U)
+        #print(Q)
+        #print(Q.dtype)
+        #print(U.dtype)
+        #print("cond numb ", np.linalg.cond(Q))
+        w = V.T @ Q  # (m, d)      
+        #print("w \n\n\n", w)
+        #print(w @ U)
+        #print("shape w ", w.shape)
+        #print(U.shape)
+        #cc, low = cho_factor(np.eye(m) / c + w @ U)
+        #sol = cho_solve((cc, low), w)
+        sol = np.linalg.solve(np.eye(m) / c + w @ U, w)  # (m, d) 
+        #print("sol \n", sol)
+        #print(sol.shape)
+        #inv = np.linalg.inv(np.eye(m) / c + w @ U)  # (m, m) 
+        fin = Q @ (U @ sol)  # (d, d) @ (d, m) @ (m, d) = (d, d)
+        #print(inv @ w)
+        #finn = fin @ (inv @ w)  # (d, d) @ (m, m) 
+        #finnn = Q - Q @ U @ inv @ V.T @ Q
+        #print(finnn) 
+        #print("trial ", (np.eye(m) / c + w @ U) @ sol)
+        #print("w", w)
+        ret = Q - fin # the identity should be cancelled, it is just to mitigate the numerical errors but it shouldn't be there
+        #print(ret)
+        #print("finish swm formula asymmetric")
+    return ret
+
+
+
 def rk_1_update_inverse(Q, u, c):
     #print(Q)
     #print("u in rk. upd inverse ", u.ndim)
@@ -217,9 +273,15 @@ def make_centered_kernel_matrix(K, m):
     #print("ms ", ms)
     u = np.ones(K.shape[0])
     w = K @ ms
+    #print(w, "\n ciao")
     sw = np.outer(w, u) + np.outer(u, w)
-    return K - sw + np.outer(u, u) * np.sum(w * ms), w, np.sum(w * ms) 
-    
+    res1 = K - sw + np.outer(u, u) * np.sum(w * ms)
+    #res2 = K - w[:, None] - w[None, :] + np.sum(w * ms)
+    #print(res1)
+    #print(res2)
+    #input()
+    #return K - w[:, None] - w[None, :] + np.sum(w * ms), w, np.sum(w * ms) 
+    return res1, w, np.sum(w * ms)
 
 def compute_stats(X, m, lbd, idx):
     # test function that compute some variances in different ways
@@ -352,5 +414,42 @@ def plot2D(X, M, extra_info):
 
 
     plt.show()
+
+
+def fastest_rk1_upd(B,u,v, alpha):
+    # Warning: `overwrite_a=True` silently fails when B is not an order=F array!
+    #assert B.flags['F_CONTIGUOUS']
+    B = np.asfortranarray(B)
+    Bu = B @ u
+    return scipy.linalg.blas.dger(alpha, Bu, v.T @ B, a=B, overwrite_a=1)
+
+
+def fastest_rk1_upd_inv(B,u,v):
+    # Warning: `overwrite_a=True` silently fails when B is not an order=F array!
+    #assert B.flags['F_CONTIGUOUS']
+    Bu = B @ u
+    alpha = -1 / (1 + v.T @ Bu)
+    return scipy.linalg.blas.dger(alpha, Bu, v.T @ B, a=B, overwrite_a=1)
+
+
+def test_fastest_rk1_upd():
+    d = 4
+    B = np.random.rand(d, d)
+    v = np.random.rand(d)
+    alpha = 1.0
+    print(B)
+    print(v)
+    B1 = fastest_rk1_upd(B, v, v, alpha)
+    B2 = B - alpha * np.outer(v, v)
+    print("\n ")
+    print(B1)
+    print(B2)
+
+
+def swm_fast(B,u,v):
+    return B - (B @ u) @ (v.T @ B) / (1 + v.T @ B @ u)
+
+
+test_fastest_rk1_upd()
 
 
