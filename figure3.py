@@ -201,8 +201,8 @@ def time_comparison_high_dimensional_cleaned():
     X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     
     exponent = (n ** (3/4)) / n
-    p1 = 0.3  # prob missing
-    M = np.random.binomial(n=1, p=p1, size= (n, d))
+    p_miss = 0.6  # prob miss
+    M = np.random.binomial(n=1, p=p_miss, size= (n, d))
     for ii in range(d):
         nbr = np.random.randint(0, n)
         if np.sum(M[:, ii]) == n:
@@ -228,7 +228,7 @@ def time_comparison_high_dimensional_cleaned():
             #F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
             print("nbr seen components ", n - np.sum(MM, axis=0))
             print("nbr missing components ", np.sum(MM, axis=0))
-            print("2 * n * p1 * (1-p1):   ", 2 * n * p1 * (1-p1))
+            print("2 * n * p1 * (1-p1):   ", 2 * n * p_miss * (1-p_miss))
             #FF = flip_matrix(M.T)
             #ones_d = np.ones(d_i)
             #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
@@ -300,10 +300,7 @@ def time_comparison_high_dimensional_cleaned():
     print("list df \n ", list_df)
     print("\nfinal df\n", final_df)
     print("\n\n SHOW THE RESULTS")
-    dd = d ** info_dic['exponent_d']
-    p1 = 1/2 - np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
-    p2 = 1/2 + np.sqrt(1 - 2 * dd/n)/2 if 2 * d/n>0 else d/(2 * n)
-
+    
     for j in range(rep):
         time_my_array[j, :] = list_df[j]['time_my']
         time_skl_array[j, :] = list_df[j]['time_skl']
@@ -318,6 +315,7 @@ def time_comparison_high_dimensional_cleaned():
     np.save("results/experiment_3/dim.npy", np.array([d]))
     np.save("results/experiment_3/R.npy", np.array([R]))
     np.save("results/experiment_3/rep.npy", np.array([rep]))
+    np.save("results/experiment_3/prob_miss.npy", np.array([p_miss]))
     
     
     '''
@@ -418,14 +416,11 @@ def plot_fig_3():
     d = np.load("results/experiment_3/dim.npy")
     R = np.load("results/experiment_3/R.npy")
     rep = np.load("results/experiment_3/rep.npy")
+    p_miss = np.load("results/experiment_3/prob_miss.npy")
     list_d = np.load("results/experiment_3/list_d.npy")
     time_my_array = np.load("results/experiment_3/time_my_array.npy") / R  # Average time for one iteration
     time_skl_array = np.load("results/experiment_3/time_skl_array.npy") / R  # Average time for one iteration
-    n = np.load("results/experiment_3/size.npy")
-    d = np.load("results/experiment_3/dim.npy")
-    R = np.load("results/experiment_3/R.npy")
-    rep = np.load("results/experiment_3/rep.npy")
-
+    
     print("size dts: ", n, ", repetitons: ", rep)
     print("dimemsions: ", list_d)
 
@@ -459,16 +454,16 @@ def plot_fig_3():
         label="±1 std"
     )
 
-    plt.legend()
-    plt.xlabel("Probability of observation")
-    plt.ylabel("Average Time")
+    plt.legend(fontsize=18)
+    plt.xlabel("Dimension", fontsize=24)
+    plt.ylabel("Average Time", fontsize=24)
     plt.grid()
     plt.show()
 
 
 
 
-time_comparison_high_dimensional_cleaned()
+#time_comparison_high_dimensional_cleaned()
 plot_fig_3()
 
 

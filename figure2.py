@@ -186,8 +186,8 @@ def time_comparison_classical_test():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [2000, 3000, 4000, 5000, 6000]  # increasing order
-    list_d = [50]  # increasing order
+    list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]  # increasing order
+    list_d = [100]  # increasing order
     lbd = 0.8765 + 0.0
     n, d = list_n[-1], list_d[-1]
     print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
@@ -209,14 +209,14 @@ def time_comparison_classical_test():
     print("exponent", exponent)
     p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
     #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.1, p_flip=p1)
-    p1 = 0.4
+    #p1 = 0.4
     #print("p1:   ", p1)
-    M = np.random.binomial(n=1, p=p1, size= (n, d))
+    #M = np.random.binomial(n=1, p=p1, size= (n, d))
     M = np.zeros((n, d))
     for i in range(d):  # n > d
         M[i, i] = 1
         M[i+1, i] = 1
-    M = np.random.binomial(n=1, p=p1, size= (n, d))
+    #M = np.random.binomial(n=1, p=p1, size= (n, d))
     #p_missing = [0.8 , 0.6, 0.3]
     #M = np.array([np.random.binomial(1, 1-pr, (nbr_of_sample, dim)) for pr in p_missing])
     X_nan = X.copy()

@@ -258,7 +258,7 @@ def test_gibb_sampling_over_parametrized_sampling():
     X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
     #print(X_nan)
-    R = 5
+    R = 4
     info_dic = {
         'data': X,
         'masks': M,
@@ -400,7 +400,9 @@ def test_gibb_sampling_fast_sampling():
     R = 4
     info_dic = {
         'data': X,
+        'imputed_data': None,
         'masks': M,
+        'gamma': None,
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,

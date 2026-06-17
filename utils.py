@@ -437,13 +437,13 @@ def test_fastest_rk1_upd():
     B = np.random.rand(d, d)
     v = np.random.rand(d)
     alpha = 1.0
-    print(B)
-    print(v)
+    #print(B)
+    #print(v)
     B1 = fastest_rk1_upd(B, v, v, alpha)
     B2 = B - alpha * np.outer(v, v)
-    print("\n ")
-    print(B1)
-    print(B2)
+    #print("\n ")
+    #print(B1)
+    #print(B2)
 
 
 def swm_fast(B,u,v):

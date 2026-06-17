@@ -3,14 +3,17 @@ from tsp import gibb_sampl_under_parametrized_sampling
 from utils import plot2D
 from hyppo.ksample import Energy
 from sklearn.impute import SimpleImputer
+import matplotlib.pyplot as plt
 
 
+# 5, 15
+np.random.seed(15)
 
 def plot2D_gaussian():
     # given a sample from a Gaussian distribution, with some hidden components,
     # run the algorithm and see if the final sampling resemble the initial one
     print("test gibb sampling udnerparametrized_sampling began")
-    n, d = 70, 2
+    n, d = 60, 2
     n0 = 20
     lbd = 0.8 + 0.0
     mean = np.array([5, 5])
@@ -23,12 +26,12 @@ def plot2D_gaussian():
     #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     #M = np.random.binomial(1, 0.3, size=(n, d))
     M = np.zeros_like(X)
-    for ii in range(d):
-        nbr = np.random.randint(0, n)
+    #for ii in range(d):
+    #    nbr = np.random.randint(0, n)
         #print("SUM OF COLUMNS MASKS ", np.sum(M[:, ii]))
-        if np.sum(M[:, ii]) == n:
-            print("add a random seen component")
-            M[nbr, ii] = 0
+    #    if np.sum(M[:, ii]) == n:
+    #        print("add a random seen component")
+    #        M[nbr, ii] = 0
     for i in range(n0, n):
         idx = np.random.randint(0, 2, 1)
         M[i, idx] = 1
@@ -73,19 +76,21 @@ def plot2D_gaussian():
     #plot2D(X, M, extra_info)
     X_nan = X.copy()
     X_nan[M==1] = np.nan
+    pvalue_list = []
     initial_imputation = SimpleImputer(missing_values=np.nan, strategy=info_dic['initial_strategy'])
     X_imputed = initial_imputation.fit_transform(X_nan)
     stat, pvalue = Energy().test(X_orig, X_imputed)
     print("stat ", stat , "pvalue ", pvalue)
+    pvalue_list.append(pvalue)
     extra_info = {'current_stat': stat, 'current_p_value': pvalue}
     plot2D(X_imputed, M, extra_info)
     res = gibb_sampl_under_parametrized_sampling(info_dic)
     stat, pvalue = Energy().test(X_orig, res)
     print("stat ", stat , "pvalue ", pvalue)
+    pvalue_list.append(pvalue)
     extra_info = {'current_stat': stat, 'current_p_value': pvalue}
     plot2D(res, M, extra_info)
-    RR = 6
-    pvalue_list = []
+    RR = 4
     for i in range(RR):
         res = gibb_sampl_under_parametrized_sampling(info_dic)
         info_dic['imputed_data'] = res
@@ -95,23 +100,23 @@ def plot2D_gaussian():
         print("iterat ", i)
         pvalue_list.append(pvalue)
         plot2D(res, M, extra_info)
+    print(pvalue_list)
+    x = np.arange(len(pvalue_list))
+    #y = [2, 5, 3, 7, 6]
+
+    # Plot points connected by a line
+    plt.plot(x, pvalue_list, marker='o', color='red')
+
+    plt.xlabel('Iterations', fontsize=24)
+    plt.ylabel('p-value', fontsize=24)
+    #plt.title('E-test', fontsize=20)
+    plt.grid(True)
+
+    plt.show()
+    
 
 
 plot2D_gaussian()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

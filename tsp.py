@@ -36,10 +36,10 @@ def gibb_sampl_fast_sampling(info):
     X_nan = X.copy()
     X_nan[M==1] = np.nan
     imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
-    X = imp_mean.fit_transform(X_nan)
+    X = imp_mean.fit_transform(X_nan) if info['imputed_data'] is None else info['imputed_data']
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
-    print("sampling ", sampling, "intercept ", intercept)
+    #print("sampling ", sampling, "intercept ", intercept)
     #print("simple imputer in gibb sample \n", X)
     #print("shape M", M.shape)
     #print("nbr masks ", np.sum(M, axis=0).shape)
@@ -50,10 +50,10 @@ def gibb_sampl_fast_sampling(info):
     #b_s = int(np.sqrt(d))  # batch size  
     #b_s = 10
     #b_s = 5
-    b_s = info['batch_size']
+    #b_s = info['batch_size']
     #print("batch size ", b_s)
-    if b_s <= 0:
-        b_s = 1
+    #if b_s <= 0:
+    #    b_s = 1
     #print("who is X in gibb sampl \n", X)
     #ones = np.ones((d, d)) 
     #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
@@ -80,20 +80,23 @@ def gibb_sampl_fast_sampling(info):
     #print(a)
     #print("\n", np.outer(u, a))
     R_centered = R - np.outer(u, mean)
-    start1 = time.time()
+    #start1 = time.time()
     cov = R_centered.T @ R_centered + lbd * np.eye(d)
-    end1 = time.time()
-    print("building the matrix time: ", end1-start1)        
+    #end1 = time.time()
+    #print("building the matrix time: ", end1-start1)        
     Q = np.linalg.inv(cov)
     start_gibb_s = time.time()
     upd_j = np.zeros((d, 2))
     #print("initial X \n", X)
-    gamma = np.ones(r) / np.arange(1, r+1)
-    gamma = np.ones(r)
+    gamma = np.ones(r) / np.arange(1, r+1) if info['gamma'] is None else info['gamma']
+    #print("gamma (damping parameter) ", gamma)
+    #gamma = np.ones(r)
     cov_gamma = cov / R_centered.shape[0]
     cov_test = cov
     #print(gamma)
     #input()
+    list_mean = []
+    list_cov = []
     for h in range(r):
         #print("iter ", h)
         for i in range(d):
@@ -122,7 +125,7 @@ def gibb_sampl_fast_sampling(info):
             Q = swm_formula(Q, mean_rescaled, -1.0)  # downdates
             
             ## small test
-            mmean = np.mean(X, axis=0)
+            #mmean = np.mean(X, axis=0)
             #cov = X.T @ X - n * np.outer(mmean, mmean) + lbd * np.eye(d)
             #print(cov)
             cov = cov_test
@@ -130,13 +133,17 @@ def gibb_sampl_fast_sampling(info):
             #print("alpha ", alpha)
             cov_gamma = cov_gamma + gamma[h] * (cov/alpha - cov_gamma)
             cov = cov_gamma * alpha
-            QQ = np.linalg.inv(cov)
+            #QQ = np.linalg.inv(cov)
             #if d<=8 and n<=10:
                 #print("small check QQ\n", QQ)
                 #print("small check Q\n", Q)
             #np.testing.assert_allclose(Q, QQ)
             #input()
-    res = {'imputed_dts': X, 'RM_cov': cov_gamma}  # RM: Robbins_Monro
+        if info['save_all_iterations']:
+            list_mean.append(mean)
+            list_cov.append(cov_gamma)
+            
+    res = {'imputed_dts': X, 'RM_cov': cov_gamma, 'list_mean':list_mean, 'list_cov':list_cov}  # RM: Robbins_Monro
     return res      
 
 
@@ -796,7 +803,7 @@ def gibb_sampl_under_parametrized(info):
                 #print(N)
                 #print("sequence of print")
                 if info['verbose'] > 0:
-                    print(X)
+                    print("verbose is true in tsp.py \n", X)
                 #print(X_upd)
                 #print(X_dwd)
                 nupd, _ = X_upd.shape

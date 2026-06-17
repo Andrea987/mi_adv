@@ -252,8 +252,8 @@ def time_vs_probabilities_missing_cleaned():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    n = 20  # increasing order
-    d = 50  # increasing order
+    n = 100  # increasing order
+    d = 300  # increasing order
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
     list_p_seen_true = [0.99, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.01]
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.70, 0.65, 0.60, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01]
@@ -536,14 +536,14 @@ def time_vs_probabilities_missing_cleaned():
 
 
 def plot_fig_4():
-
-    list_p_seen_true = np.load("results/experiment_4/list_p_seen_true.npy")
-    time_my_array = np.load("results/experiment_4/time_my_array.npy")
-    time_skl_array = np.load("results/experiment_4/time_skl_array.npy")
     n = np.load("results/experiment_4/size.npy")
     d = np.load("results/experiment_4/dim.npy")
     R = np.load("results/experiment_4/R.npy")
     rep = np.load("results/experiment_4/rep.npy")
+    list_p_seen_true = np.load("results/experiment_4/list_p_seen_true.npy") 
+    time_my_array = np.load("results/experiment_4/time_my_array.npy") / R
+    time_skl_array = np.load("results/experiment_4/time_skl_array.npy") / R
+    
     
     time_my_array_mean = time_my_array.mean(axis=0)
     time_my_array_std = time_my_array.std(axis=0)
@@ -580,6 +580,7 @@ def plot_fig_4():
     plt.ylabel("Average Time")
     plt.grid()
     plt.show()
+
 
 
 
