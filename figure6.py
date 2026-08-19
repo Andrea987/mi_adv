@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import copy
-from tsp import gibb_sampl_under_parametrized_sampling, gibb_sampl_under_parametrized
+from tsp import gibb_sampl_sampling
 from generate import generate_mask_with_bounded_flip, generate_masks_mnar
 from utils import generate_matrix_with_bounded_flip
 from sklearn.linear_model import Ridge
@@ -12,159 +12,137 @@ from sklearn.impute import IterativeImputer
 from scipy.sparse.linalg import LinearOperator, cg
 from sklearn.linear_model import BayesianRidge, Ridge
 from dataset_load import dataset_loader
+from sklearn.model_selection import train_test_split
 import pandas as pd
-
-
+from hyppo.ksample import Energy
+from pathlib import Path
 
 np.random.seed(54321)
 
-### Assumption: to avoid numerical issue, we should renormalize the data
-### that's not super realistic of course
+DATASETS = ['iris', 'wine', 'boston', 'california', 'parkinsons', \
+            'climate_model_crashes', 'concrete_compression', \
+            'yacht_hydrodynamics', 'airfoil_self_noise', \
+            'connectionist_bench_sonar', 'ionosphere', 'qsar_biodegradation', \
+            'seeds', 'glass', 'ecoli', 'yeast', 'libras', 'planning_relax', \
+            'blood_transfusion', 'breast_cancer_diagnostic', \
+            'connectionist_bench_vowel', 'concrete_slump', \
+            'wine_quality_red', 'wine_quality_white']
 
+# check if all the variables are continuos
+# 
 
-
-def time_comparison_classical_true_dataset():
-    print("\n\nstarting plot some graph()\n")
+def time_comparison_real_dataset_cleaned():
+    print("Suppose n>d")
     #list_n = [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    list_n = [2000, 3000, 4000, 5000, 6000]  # increasing order
-    list_d = [100]  # increasing order
-    lbd = 0.8765 + 0.0
-    n, d = list_n[-1], list_d[-1]
-    print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
-    print("n ** (3/4)", n ** (3/4))
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
-    X_orig = np.random.rand(n, d) + 0.0
+    dataset = 'wine_quality_red'
+    X_orig = dataset_loader(dataset)
+    n, d = X_orig.shape
     print(X_orig.dtype)
-    print("max min ")
     mean = np.mean(X_orig, axis=0)
     std = np.std(X_orig, axis=0)
+    lbd = 0.001 + 0.0
     # Standardize
     X = (X_orig - mean) / std
-    X = X_orig
-    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
-    #print(np.max(X))
-    #print(np.min(X))
-    #M = np.random.binomial(1, 0.01, size=(n, d))
-    exponent = (n ** (3/4)) / n
-    print("exponent", exponent)
-    p1 = 1/2 - np.sqrt(1 - 2 * d/n)/2 if 2 * d/n>0 else d/(2 * n)
-    #M = make_mask_with_bounded_flip(n=n, d=d, p_miss=0.1, p_flip=p1)
-    p1 = 0.4
-    #print("p1:   ", p1)
-    M = np.random.binomial(n=1, p=p1, size= (n, d))
-    M = np.zeros((n, d))
-    for i in range(d):  # n > d
-        M[i, i] = 1
-        M[i+1, i] = 1
-    M = np.random.binomial(n=1, p=p1, size= (n, d))
-    #p_missing = [0.8 , 0.6, 0.3]
-    #M = np.array([np.random.binomial(1, 1-pr, (nbr_of_sample, dim)) for pr in p_missing])
-    X_nan = X.copy()
-    X_nan[M==1] = np.nan
-    #print("X_nan \n", X_nan)
-    R = 2
-    tsp_switch = False
-    df = pd.DataFrame(columns=['n_train', 'dim', 'p_miss'])
-    #print(df)
-    total_time_gibb_sampl = np.zeros((len(list_n), len(list_d)))
-    total_time_ridge = np.zeros_like(total_time_gibb_sampl)
-    total_time_baseline = np.zeros_like(total_time_gibb_sampl)
-    for i, d_i in enumerate(list_d):
-        print("\ncurrent dimension ", d_i)
-        for j, n_j in enumerate(list_n):
-            print("\n\n current size ", n_j)
-            ones = np.ones((d_i, d_i))
-            MM = M[0:n_j, 0:d_i]
-            #F = n_j * ones - MM.T @ MM - (np.ones_like(MM.T) - MM.T) @ (np.ones_like(MM) - MM)
-            print("nbr seen components ", n_j - np.sum(MM, axis=0))
-            print("nbr missing components ", np.sum(MM, axis=0))
-            print("2 * n * p1 * (1-p1):   ", 2 * n_j * p1 * (1-p1))
-            #FF = flip_matrix(M.T)
-            #ones_d = np.ones(d_i)
-            #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
-            #F = np.outer(ones_d, np.sum(M, axis=0)) + np.outer(np.sum(M.T, axis=1), ones_d) - 2 * M_s.T @ M_s
-            #print("flip matrix in make mask with bounded flip\n", F[0:8, 0:8])
-            info_dic = {
-                'data': X[0:n_j, 0:d_i],
-                'masks': M[0:n_j, 0:d_i],
-                'imputed_data': None,
-                'initial_strategy': 'constant',
-                'exponent_d': 0.75,
-                'nbr_it_gibb_sampl': R,
-                'lbd_reg': lbd,
-                'tsp': tsp_switch,
-                'recomputation': False,
-                'batch_size': 64,
-                'verbose': 0,
-                'sampling': False,
-                'intercept': True
-            }
-            start_time_gibb_sampl = time.time()
-            X_my = gibb_sampl_under_parametrized_sampling(info_dic)
-            end_time_gibb_sampl = time.time()
-            print(f"Execution time: {end_time_gibb_sampl - start_time_gibb_sampl:.4f} seconds")
-        #   print(X_my)
-            total_time_gibb_sampl[j, i] = end_time_gibb_sampl - start_time_gibb_sampl
-            print("\nend my gibb sampling\n")
+    #X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    p_miss = 0.25
+    R = 100
+    intercept_switch = True
+    df = pd.DataFrame(columns=['size', 'time_tsp_true', 'time_tsp_false'])
+    list_df = []
+    rep = 1
+    p_value_array = np.zeros((rep, R))
+    info_dic = {
+            'data': None,
+            'masks': None,
+            'imputed_data': None,
+            'nbr_it_gibb_sampl': 1,
+            'lbd_reg': lbd,
+            'tsp': False,
+            #'recomputation': False,
+            'batch_size': 64,
+            'verbose': 0,
+            'initial_strategy': 'constant',
+            'exponent_d': 0.75,
+            'sampling': True,
+            'intercept': intercept_switch
+        }
+    M = np.random.binomial(n=1, p=p_miss, size= (n, d))
+    for r in range(rep):
+        print("\n\nREPETITION: ", r, "\n")
+        X_train, X_test, M_train, M_test = train_test_split(X, M, test_size=0.30)
+        n_tr, n_ts = X_train.shape[0], X_test.shape[0]
+        info_dic['data'], info_dic['masks'] = X_train, M_train
+        print("nbr seen components ", n_tr - np.sum(M_train, axis=0))
+        print("nbr missing components ", np.sum(M_train, axis=0))
+        for i in range(R):
+            print("iterat gs", i)
+            X_train_filled = gibb_sampl_sampling(info_dic)
+            info_dic['imputed_data'] = X_train_filled
+            stat, pvalue = Energy().test(X_test, X_train_filled)
+            print("stat ", stat , "pvalue ", pvalue)
+            #extra_info = {'current_stat': stat, 'current_p_value': pvalue}
+            p_value_array[r, i] = pvalue
+        info_dic['data'], info_dic['masks'] = None, None
+        
+    print("\n\n SHOW THE RESULTS")
+    
+    folder = Path("results/experiment_6")
+    folder.mkdir(parents=True, exist_ok=True)
 
-            print("It imputer Ridge Reg")
-            start44 = time.time()   # tic
-            ice4 = IterativeImputer(estimator=Ridge(fit_intercept=True, alpha=lbd, tol=0.0), imputation_order='roman', max_iter=R, initial_strategy=info_dic['initial_strategy'], verbose=0)
-            end44 = time.time()   # tic
-            print(f"Elapsed time no 4 iterative imputer definition: {end44 - start44:.4f} seconds\n\n")
+    np.save("results/experiment_6/p_value_array.npy", p_value_array)
+    np.save("results/experiment_6/dataset.npy", np.array([dataset]))
+    np.save("results/experiment_6/size.npy", np.array([n]))
+    np.save("results/experiment_6/dim.npy", np.array([d]))
+    np.save("results/experiment_6/R.npy", np.array([R]))
+    np.save("results/experiment_6/rep.npy", np.array([rep]))
+    np.save("results/experiment_6/prob_miss.npy", np.array([p_miss]))
 
-            start4 = time.time()
-            res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
-            #print("result IterativeImptuer with Ridge\n", res4)
-            end4 = time.time()     # toc
-            total_time_ridge[j, i] = end4 - start4 
-            print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end4 - start4:.4f} seconds\n\n")
-            #np.testing.assert_allclose(X_my, res4)
+    
+    
 
-            start_baseline = time.time()   # tic
-            #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])
-            X_my_baseline = gibb_sampl_under_parametrized(info_dic)  
-            # print("result IterativeImptuer with Ridge\n", res4)
-            end_baseline = time.time()     # toc
-            np.testing.assert_allclose(X_my_baseline, res4) if info_dic['intercept'] is False else print("no test X_my_baseline vs res4")
-            total_time_baseline[j, i] = end_baseline - start_baseline
-            print(f"Elapsed time no 4 iterative imputer baseline prec: {end_baseline - start_baseline:.4f} seconds\n\n")
-            #if not info_dic['tsp']:
-            #np.testing.assert_allclose(X_my, res4)
-            #np.testing.assert_allclose(X_my, res4)
-            print("test gibb sampl ended successfully")    
-    print("total time gibb sampl\n", total_time_gibb_sampl)
-    print("total time ridge\n", total_time_ridge)
-    print("total time baseline\n", total_time_baseline)
-    total_time_gibb_sampl = total_time_gibb_sampl / R
-    total_time_ridge = total_time_ridge / R
-    total_time_baseline = total_time_baseline / R
+def plot_fig_6():
+
+    dataset = np.load("results/experiment_6/dataset.npy")[0]
+    n = np.load("results/experiment_6/size.npy")
+    d = np.load("results/experiment_6/dim.npy")
+    #R = np.load("results/experiment_6/R.npy")[0]
+    #rep = np.load("results/experiment_6/rep.npy")
+    p_miss = np.load("results/experiment_6/prob_miss.npy")
+    p_value_array = np.load("results/experiment_6/p_value_array.npy")
+    
+    rep, R = p_value_array.shape
+    
+    p_value_array_mean = p_value_array.mean(axis=0)
+    p_value_array_std = p_value_array.std(axis=0)
 
     clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
-    for i, d_i in enumerate(list_d):
-        plt.plot(list_n, total_time_gibb_sampl[:, i], label="our_gibb, dim: " + str(d_i), marker="o", color=clr[i])
-        plt.plot(list_n, total_time_ridge[:, i], label="ridge  , dim: " + str(d_i), marker="*", color=clr[i+1])
-        plt.plot(list_n, total_time_baseline[:, i], label="baseline  , dim: " + str(d_i), marker="s", color=clr[i+2])
-        #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
-        plt.xlabel("train size")
-        plt.ylabel("time")
-    plt.title("Time in function of training size")
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    #plt.text(5.05, 0.5, "ciao sono un testo", rotation=0)
-    text = "MCAR p_miss: " + str(p1) + "\n\n"
-    #text = "prob flip: " + str(p1) + "\n\n"
-    text1 = "tsp: " + str(tsp_switch) + "nbr it: " + str(R)
+    plt.plot(np.arange(R), p_value_array_mean, label="p-value", marker="o", color=clr[0])
+    
+    plt.fill_between(
+        np.arange(R),
+        p_value_array_mean - p_value_array_std,
+        p_value_array_mean + p_value_array_std,
+        alpha=0.3,
+        color="blue",
+        label="±1 std"
+    )
 
-    plt.figtext(0.71, 0.65, "Extra info about curves:\n" + text + text1, fontsize=10)
-    plt.tight_layout() 
-    #plt.legend()
+    plt.legend(fontsize=18)
+    plt.xlabel("Dimension", fontsize=24)
+    plt.ylabel("Average Time", fontsize=24)
+    plt.grid()
     plt.show()
 
 
-time_comparison_classical_test()
+
+time_comparison_real_dataset_cleaned()
+plot_fig_6()
+
+
 
 
 

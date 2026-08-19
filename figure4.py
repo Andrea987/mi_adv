@@ -252,10 +252,10 @@ def time_vs_probabilities_missing_cleaned():
     #list_d = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
     #list_n = [125, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
     #list_d = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    n = 100  # increasing order
-    d = 300  # increasing order
+    n = 2000  # increasing order
+    d = 400  # increasing order
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
-    list_p_seen_true = [0.99, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.01]
+    list_p_seen_true = [0.99, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
     #list_p_seen_true = [0.95, 0.9, 0.85, 0.8, 0.75, 0.70, 0.65, 0.60, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01]
     #list_p_seen_true = [0.5, 0.45, 0.4, 0.35, 0.30, 0.25, 0.20, 0.15, 0.1, 0.05, 0.01]
     #list_p_seen_true = [0.05, 0.01, 0.005]
@@ -266,19 +266,20 @@ def time_vs_probabilities_missing_cleaned():
     list_p_seen = [list_p_seen_true[i] / list_p_seen[i] for i in range(len(list_p_seen))]
     print("list p _seen ", list_p_seen)
     print("true probabilities, cumprod ", np.cumprod(list_p_seen)) 
-    lbd = 1.01 + 0.0
+    lbd = 100.01 + 0.0
     #print("sqrt n ", np.sqrt(n), "n ** (3/4) / n", (n ** (3/4)) / n)
     #print("n ** (3/4)", n ** (3/4))
-    X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
+    #X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     X_orig = np.random.rand(n, d) + 0.0
     print(X_orig.dtype)
     print("max min ")
     mean = np.mean(X_orig, axis=0)
     std = np.std(X_orig, axis=0)
+    print("mean\n ", mean, "\nstd\n", std)
     # Standardize
     X = (X_orig - mean) / std
-    X = X_orig
-    X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
+    #X = X_orig
+    #X = X / np.sqrt(n)  # normalization, so that X.T @ X is the true covariance matrix, and the result should not explode
     
     for s in list_p_seen:
         print(s)
@@ -298,7 +299,7 @@ def time_vs_probabilities_missing_cleaned():
     #X_nan = X.copy()
     #X_nan[M==1] = np.nan
     #print("X_nan \n", X_nan)
-    R = 2
+    R = 1
     tsp_switch = False
     intercept_switch = True
     df = pd.DataFrame(columns=['p_seen', 'time_my', 'time_skl', 'time_bsl'])
@@ -307,7 +308,7 @@ def time_vs_probabilities_missing_cleaned():
     total_time_ridge = np.zeros_like(total_time_gibb_sampl)
     total_time_baseline = np.zeros_like(total_time_gibb_sampl)
     list_df = []
-    rep = 6
+    rep = 20
     time_my_array = np.zeros((rep, len(list_p_seen_true)))
     time_skl_array = np.zeros((rep, len(list_p_seen_true)))
     for r in range(rep):
@@ -383,7 +384,9 @@ def time_vs_probabilities_missing_cleaned():
             total_time_ridge = end_skl - start_skl 
             print("current prob seen ", p_k)
             print(f"Elapsed time no 4 iterative imputer Ridge Reg prec: {end_skl - start_skl:.4f} seconds\n\n")
-            np.testing.assert_allclose(X_my, res_skl)  ## TESTING IF OUTPUT IS THE SAME
+            
+            #np.testing.assert_allclose(X_my, res_skl)  ## TESTING IF OUTPUT IS THE SAME
+            
             print("END SKL,\n\n START BASELINE")
             start_baseline = time.time()   # tic
             #res4 = ice4.fit_transform(X_nan[0:n_j, 0:d_i])

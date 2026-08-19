@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from sklearn.datasets import load_iris, load_wine, fetch_california_housing
+from pathlib import Path
 
 import os
 import pandas as pd
@@ -96,12 +97,17 @@ def dataset_loader(dataset):
 
 
 def fetch_parkinsons():
-    if not os.path.isdir('../datasets/parkinsons'):
-        os.mkdir('../datasets/parkinsons')
+    print("you are in fetch parkinsosn")
+    if not os.path.isdir('datasets/parkinsons'):
+        print("before mkdir")
+        folder = Path("datasets/parkinsons")
+        folder.mkdir(parents=True, exist_ok=True)
+        #os.mkdir('datasets/parkinsons')
+        print("after mkdir")
         url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data'
         wget.download(url, out='datasets/parkinsons/')
 
-    with open('../datasets/parkinsons/parkinsons.data', 'rb') as f:
+    with open('datasets/parkinsons/parkinsons.data', 'rb') as f:
         df = pd.read_csv(f, delimiter=',', header = 0)
         Xy = {}
         Xy['data'] = df.values[:, 1:].astype('float')
@@ -201,12 +207,14 @@ def fetch_ionosphere():
 
 
 def fetch_qsar_biodegradation():
-    if not os.path.isdir('../datasets/qsar_biodegradation'):
-        os.mkdir('../datasets/qsar_biodegradation')
+    if not os.path.isdir('datasets/qsar_biodegradation'):
+        folder = Path("datasets/qsar_biodegradation")
+        folder.mkdir(parents=True, exist_ok=True)
+        #os.mkdir('../datasets/qsar_biodegradation')
         url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/00254/biodeg.csv'
         wget.download(url, out='datasets/qsar_biodegradation/')
 
-    with open('../datasets/qsar_biodegradation/biodeg.csv', 'rb') as f:
+    with open('datasets/qsar_biodegradation/biodeg.csv', 'rb') as f:
         df = pd.read_csv(f, delimiter=';', header = None)
         Xy = {}
         Xy['data'] = df.values[:, :-1].astype('float')
@@ -318,12 +326,15 @@ def fetch_blood_transfusion():
     return Xy
 
 def fetch_breast_cancer_diagnostic():
-    if not os.path.isdir('../datasets/breast_cancer_diagnostic'):
-        os.mkdir('../datasets/breast_cancer_diagnostic')
+    if not os.path.isdir('datasets/breast_cancer_diagnostic'):
+        print("after if in breast cancer diag")
+        folder = Path("datasets/breast_cancer_diagnostic")
+        folder.mkdir(parents=True, exist_ok=True)
+        #os.mkdir('../datasets/breast_cancer_diagnostic')
         url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data'
         wget.download(url, out='datasets/breast_cancer_diagnostic/')
 
-    with open('../datasets/breast_cancer_diagnostic/wdbc.data', 'rb') as f:
+    with open('datasets/breast_cancer_diagnostic/wdbc.data', 'rb') as f:
         df = pd.read_csv(f, delimiter=',', header=None)
         Xy = {}
         Xy['data'] = df.values[:, 2:].astype('float')
@@ -333,12 +344,14 @@ def fetch_breast_cancer_diagnostic():
 
 
 def fetch_connectionist_bench_vowel():
-    if not os.path.isdir('../datasets/connectionist_bench_vowel'):
-        os.mkdir('../datasets/connectionist_bench_vowel')
+    if not os.path.isdir('datasets/connectionist_bench_vowel'):
+        folder = Path("datasets/connectionist_bench_vowel")
+        folder.mkdir(parents=True, exist_ok=True)
+        #os.mkdir('../datasets/connectionist_bench_vowel')
         url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/undocumented/connectionist-bench/vowel/vowel-context.data'
         wget.download(url, out='datasets/connectionist_bench_vowel/')
 
-    with open('../datasets/connectionist_bench_vowel/vowel-context.data', 'rb') as f:
+    with open('datasets/connectionist_bench_vowel/vowel-context.data', 'rb') as f:
         df = pd.read_csv(f, delimiter='\s+', header=None)
         Xy = {}
         Xy['data'] = df.values[:, 3:-1].astype('float')
@@ -363,12 +376,14 @@ def fetch_concrete_slump():
 
 
 def fetch_wine_quality_red():
-    if not os.path.isdir('../datasets/wine_quality_red'):
-        os.mkdir('../datasets/wine_quality_red')
+    if not os.path.isdir('datasets/wine_quality_red'):
+        folder = Path("datasets/wine_quality_red")
+        folder.mkdir(parents=True, exist_ok=True)
+        #os.mkdir('datasets/wine_quality_red')
         url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv'
         wget.download(url, out='datasets/wine_quality_red/')
 
-    with open('../datasets/wine_quality_red/winequality-red.csv', 'rb') as f:
+    with open('datasets/wine_quality_red/winequality-red.csv', 'rb') as f:
         df = pd.read_csv(f, delimiter=';')
         Xy = {}
         Xy['data'] = df.values[:, 1:-1].astype('float')

@@ -44,7 +44,9 @@ def obs_log_lkh(S, mu, M, X):
         mu0 = mu[m==0]
         Soo_inv = np.linalg.inv(Soo)
         h = np.outer(xo-mu0, xo-mu0)
-        res = res + np.linalg.slogdet(Soo_inv)[1] - np.sum(Soo_inv * h)
+        quad = np.sum(Soo_inv * h)
+        #res = res + np.linalg.slogdet(Soo_inv)[1] - np.sum(Soo_inv * h)
+        res = res - 0.5 * (l * np.log(2 * np.pi) + np.linalg.slogdet(Soo)[1] + quad)
     return res
 
 def em_miss(info):

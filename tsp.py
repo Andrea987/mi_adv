@@ -165,6 +165,77 @@ def gibb_sampl_fast_sampling(info):
     return res
 
 
+
+
+def online_gibbs_sampling(info):
+    # this code implement the online Gibb sampler, that is update the covariance matrix
+    # by a convex combination of the previous covariance matrix and the new one, computed 
+    # starting from the new imputed dataset.
+    X = info['data']
+    M = info['masks']
+    n, d = X.shape
+    X_nan = X.copy()
+    X_nan[M==1] = np.nan
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy=info['initial_strategy'])
+    X = imp_mean.fit_transform(X_nan) if info['imputed_data'] is None else info['imputed_data']
+    sampling = info['sampling'] if 'sampling' in info else False
+    intercept = info['intercept'] if 'intercept' in info else True
+    r = info['nbr_it_gibb_sampl']
+    lbd = info['lbd_reg']
+    n, d = X.shape
+    gamma = info['gamma'] if ('gamma' in info and info['gamma'] is not None) else np.ones(d)
+    R = X.copy()  # X[first_mask == 0, :]
+    #print("first set vct ", R)
+    #print("first set vct shape ", R.shape)
+    mean = np.mean(R, axis=0) if intercept else np.zeros(R.shape[1])
+    u = np.ones(R.shape[0])
+    #print(a)
+    #print("\n", np.outer(u, a))
+    R_centered = R - np.outer(u, mean)
+    #start1 = time.time()
+    cov1 = R_centered.T @ R_centered + lbd * np.eye(d)
+    cov1 = cov1 / n
+    cov = np.cov(X, rowvar=False, ddof=0) + lbd * np.eye(d) /n
+    np.testing.assert_allclose(cov, cov1)
+    #end1 = time.time()
+    #print("building the matrix time: ", end1-start1)
+    Q = np.linalg.inv(cov)
+    start_gibb_s = time.time()
+    upd_j = np.zeros((d, 2))
+    list_mean = []
+    list_cov = []
+    list_precision = []
+    gamma_counter = 0
+    mean_gamma, cov_gamma = mean, cov
+    Q = np.linalg.inv(cov)
+    for h in range(r):
+        #print("iter ", h)
+        for i in range(d):
+            #print("index gibb sampl no mod", i)
+            X_pre_upd = X
+            #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean_gamma, cov_gamma, Q , M, i, sampling, intercept)
+            mean_new = np.mean(X, axis=0)  # new mean
+            cov_new = np.cov(X, rowvar=False, ddof=0) + lbd * np.eye(d) / n
+            mean_gamma = mean_gamma + gamma[gamma_counter] * (mean_new - mean_gamma)
+            cov_gamma = cov_gamma + gamma[gamma_counter] * (cov_new - cov_gamma)
+            Q = np.linalg.inv(cov_gamma)
+
+            gamma_counter = gamma_counter + 1
+        if info['save_all_iterations']:
+            list_mean.append(mean_gamma)
+            list_cov.append(cov_gamma)
+            list_precision.append(Q)
+
+    res = {'imputed_dts': X, 'list_mean':list_mean, 'list_cov': list_cov, 'list_precision': list_precision}
+    return res
+
+
+
+
+
+
+
 def gibb_sampl_under_parametrized_sampling(info):
     # flip matrix
     #if info['ml_or_bs'] not in ['bayesian', 'max_lh']:

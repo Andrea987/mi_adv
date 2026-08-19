@@ -2,7 +2,7 @@ import numpy as np
 import time
 from generate import generate_mask_with_bounded_flip
 from tsp_imputation import impute_matrix_under_parametrized, impute_matrix_overparametrized
-from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling, gibb_sampl_fast_sampling
+from tsp import gibb_sampl_over_parametrized_sampling, gibb_sampl_under_parametrized_sampling, gibb_sampl_fast_sampling, online_gibbs_sampling
 from utils import flip_matrix_manual, rk_1_update_inverse, swm_formula, matrix_switches, split_upd, s, update_covariance
 from utils import make_centered_kernel_matrix, update_inverse_rk2_sym, plot2D
 from sklearn.experimental import enable_iterative_imputer
@@ -415,7 +415,54 @@ def test_gibb_sampling_fast_sampling():
         'verbose': 0
     }
     res = gibb_sampl_fast_sampling(info_dic)
-    print("test gibb sampl fast sampling ended successfully\n\n")    
+    print("test gibb sampl fast sampling ended successfully\n\n")
+
+
+def test_online_gibbs_sampling_matches_fast_sampling():
+    # with gamma[h] = 1 for every step, online_gibbs_sampling should discard the
+    # previous mean/cov estimate entirely at each update, matching the exact
+    # incremental recomputation done by gibb_sampl_fast_sampling.
+    print("test online gibbs sampling matches fast sampling started")
+    n, d = 60, 6
+    lbd = 0.1 + 0.0
+
+    mean_true = np.random.rand(d)
+    cov_true = np.random.rand(n, d)
+    cov_true = cov_true.T @ cov_true + np.eye(d) * 0.1
+    X = np.random.multivariate_normal(mean_true, cov_true, size=n)
+
+    M = np.random.binomial(1, 0.3, size=(n, d))
+    for j in range(d):
+        if np.sum(M[:, j]) == n:
+            M[np.random.randint(n), j] = 0
+
+    R = 5
+    base_info = {
+        'data': X,
+        'imputed_data': None,
+        'masks': M,
+        'save_all_iterations': True,
+        'nbr_it_gibb_sampl': R,
+        'lbd_reg': lbd,
+        'tsp': False,
+        'recomputation': False,
+        'initial_strategy': 'constant',
+        'sampling': False,
+        'intercept': True,
+        'batch_size': 64,
+        'verbose': 0,
+    }
+
+    info_fast = dict(base_info, gamma=None)
+    info_online = dict(base_info, gamma=np.ones(R * d))
+
+    res_fast = gibb_sampl_fast_sampling(info_fast)
+    res_online = online_gibbs_sampling(info_online)
+
+    for h in range(R):
+        np.testing.assert_allclose(res_online['list_mean'][h], res_fast['list_mean'][h])
+        np.testing.assert_allclose(res_online['list_cov'][h], res_fast['list_cov'][h])
+    print("test online gibbs sampling matches fast sampling ended successfully")
 
 
 
@@ -430,6 +477,7 @@ test_gibb_sampling_over_parametrized_sampling()
 
 
 test_gibb_sampling_fast_sampling()
+test_online_gibbs_sampling_matches_fast_sampling()
 print("pause: input()")
 input()
 

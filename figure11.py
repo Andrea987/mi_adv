@@ -8,16 +8,17 @@ from em_miss import em_miss, em_gaussian_missing
 from pathlib import Path
 
 
-np.random.seed(54321)
+np.random.seed(542)
 
 def GibbsEM_vs_EM():
-    n = 200
-    d = 5
+    n = 20
+    d = 3
     lbd = 0.0 + 0.0
-    mean = np.random.rand(d)
+    #mean = np.random.rand(d)
+    mean = np.zeros(d)
     cov1 = np.random.rand(n, d)
     #cov1 = np.random.randint(0, 5, (n, d))
-    M = np.random.binomial(1, 0.4, size=(n, d))
+    M = np.random.binomial(1, 0.2, size=(n, d))
     for i in range(n):
         m = M[i, :]
         j = np.random.randint(0, d)
@@ -26,9 +27,9 @@ def GibbsEM_vs_EM():
     print("M in GibbbsEM_vs_EM\n", M)
     print("M in gibb sampling fast sampling, tsp_test.py\n", M) if n<=10 and d<=10 else print("")
 
-    sampling, intercept = True, True
+    sampling, intercept = True, False
     cov = (cov1.T @ cov1) / n + np.eye(d) * 0.1
-    rep, nbr_it = 15, 50
+    rep, nbr_it = 10, 10000
     it_em = nbr_it
     it_gibb_sampl = nbr_it
 
@@ -52,7 +53,8 @@ def GibbsEM_vs_EM():
             'verbose': 0, 
             'sampling': False,
             'cov_gt': cov,
-            'mean_gt': mean
+            'mean_gt': mean,
+            'save_all_iterations': True
         }
         info_dic_gs = {
             'data': X_orig,
@@ -88,6 +90,12 @@ def GibbsEM_vs_EM():
 
         it_em_mean, it_em_cov = np.stack(it_em_mean), np.stack(it_em_cov)
         it_gs_mean, it_gs_cov = np.stack(it_gs_mean), np.stack(it_gs_cov)
+        diffs_mean_em, diffs_cov_em = np.diff(it_em_mean, axis=0), np.diff(it_em_cov, axis=0)
+        diffs_mean_gs, diffs_cov_gs = np.diff(it_gs_mean, axis=0), np.diff(it_gs_cov, axis=0)
+        rmse_mean_em1, rmse_mean_gs1 = np.linalg.norm(diffs_mean_em, axis=-1), np.linalg.norm(diffs_mean_gs, axis=-1)
+        rmse_cov_em1, rmse_cov_gs1 = np.linalg.norm(diffs_cov_em, axis=-1), np.linalg.norm(diffs_cov_gs, axis=-1)
+        print("mean_n - mean_(n-1), norm, em: ", rmse_mean_em1, "\nmean_n - mean_(n-1), norm, gs: ", rmse_mean_gs1)
+        print("cov_n - cov_(n-1), norm, em: ", rmse_cov_em1, "\ncov_n - cov_(n-1), norm, gs: ", rmse_cov_gs1)
         diff_mean = it_em_mean - it_gs_mean
         diff_cov = it_em_cov- it_gs_cov
         rmse_mean = np.linalg.norm(diff_mean, axis=-1)
@@ -122,7 +130,7 @@ def plot_fig_11():
     differences_mean = differences.mean(axis=0)
     differences_std = differences.std(axis=0)
     clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
-    plt.plot(np.arange(nbr_it), differences_mean, marker="o", color=clr[4])
+    plt.plot(np.arange(nbr_it), differences_mean, marker=".", color=clr[4])
     
     plt.fill_between(
         np.arange(nbr_it),
