@@ -46,6 +46,8 @@ def impute_matrix_under_parametrized(XX, Q, M, i):
     return X, v  # imputed matrix, coeff
 
 
+
+# impute_matrix_overparametrized is inefficient, be careful
 def impute_matrix_overparametrized(X, M, K ,K_inv, lbd, idx):
     n_m = np.sum(M[:, idx])  #  nbr missing, M_ij = 1 iff component is missing
     n_s = np.sum(1-M[:, idx])
@@ -233,7 +235,7 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
 
 
 
-def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling, intercept):#XX, mu, S, Q, M, i):
+def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling, intercept):  #XX, mu, S, Q, M, i):
     # K: kernel matrix centered and regulirized
     # K_inv: inverse of K
     # lbd: regulirizer
@@ -288,7 +290,7 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
         #np.testing.assert_allclose(x, prediction1.squeeze())
     else:  # many missing components, it's better to work with the the submatrix of seen components
         #print("n_s < n_m")
-        K_SS = K[m == 0, :][:, m == 0]  # submatrix of regulirized seen components
+        K_SS = K[m == 0, :][:, m == 0]  # submatrix of seen components, regulirized with lbd * Id
         K_MS = K[m == 1, :][:, m == 0]
         Xss = X_s - mean_idx
         x1 = np.linalg.solve(K_SS, Xss)

@@ -27,7 +27,7 @@ import ot
 
 
 def gibb_sampl_fast_sampling(info):
-    ## this code implement the fast Gibb sampler, that is consider as covariance matrix the 
+    ## this code implement the fast Gibb sampler, that is consider as covariance matrix the
     ## the one obtained by summing all the tensor associated to the vectors of the dataset.
     ## In the MICE versione, each dataset is composed by a subset of observations
     X = info['data']
@@ -47,7 +47,7 @@ def gibb_sampl_fast_sampling(info):
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
     n, d = X.shape
-    #b_s = int(np.sqrt(d))  # batch size  
+    #b_s = int(np.sqrt(d))  # batch size
     #b_s = 10
     #b_s = 5
     #b_s = info['batch_size']
@@ -55,14 +55,14 @@ def gibb_sampl_fast_sampling(info):
     #if b_s <= 0:
     #    b_s = 1
     #print("who is X in gibb sampl \n", X)
-    #ones = np.ones((d, d)) 
+    #ones = np.ones((d, d))
     #F = n * ones - M.T @ M - (np.ones_like(M.T) - M.T) @ (np.ones_like(M) - M)
     #print("flip matrix\n", F)
     #if info['tsp']:
     #    start_time = time.time()
     #    permutation, distance = solve_tsp_local_search(F)
     #    end_time = time.time()
-    #    print("optimal perm ", permutation, "optimal dist ", distance) 
+    #    print("optimal perm ", permutation, "optimal dist ", distance)
     #    print(f"Execution time tsp: {end_time - start_time:.4f} seconds")
     #    M = M[:, permutation]
     #    X = X[:, permutation]
@@ -71,7 +71,7 @@ def gibb_sampl_fast_sampling(info):
     #Ms = matrix_switches(M)
     #first_mask = M[:, 0]
     #print("\n ", first_mask)
-    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix 
+    #X = X * (1/np.sqrt(n))  # normalize the column, so that the final matrix will be the covariance matrix
     R = X.copy()  # X[first_mask == 0, :]
     #print("first set vct ", R)
     #print("first set vct shape ", R.shape)
@@ -82,69 +82,87 @@ def gibb_sampl_fast_sampling(info):
     R_centered = R - np.outer(u, mean)
     #start1 = time.time()
     cov = R_centered.T @ R_centered + lbd * np.eye(d)
+    cov = cov / n
     #end1 = time.time()
-    #print("building the matrix time: ", end1-start1)        
+    #print("building the matrix time: ", end1-start1)
     Q = np.linalg.inv(cov)
     start_gibb_s = time.time()
     upd_j = np.zeros((d, 2))
     #print("initial X \n", X)
-    gamma = np.ones(r) / np.arange(1, r+1) if info['gamma'] is None else info['gamma']
+    #gamma = (1/2) * np.ones(r * d) / np.arange(1, r * d + 1) if info['gamma'] is None else info['gamma']
+    #gamma = np.ones(r * d)
     #print("gamma (damping parameter) ", gamma)
     #gamma = np.ones(r)
-    cov_gamma = cov / R_centered.shape[0]
-    cov_test = cov
+    #mean_gamma = mean
+    #cov_gamma = cov / n
+    #cov_test = cov
     #print(gamma)
     #input()
     list_mean = []
     list_cov = []
+    list_precision = []
     for h in range(r):
         #print("iter ", h)
         for i in range(d):
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
-            alpha = R_centered.shape[0]
-            X, _ = impute_matrix_under_parametrized_sampling(X, mean, cov / alpha, Q * alpha, M, i, sampling, intercept)
-            old_mean_rescaled = np.sqrt(n) * mean  # old_mean, before making the update 
+
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean, cov, Q , M, i, sampling, intercept)
+            old_mean = mean
+            old_mean_rescaled = np.sqrt(n) * mean  # old_mean, before making the update
             mean = np.mean(X, axis=0)  # new mean
             mean_rescaled = np.sqrt(n) * mean  # new mean, after the update
             if info['verbose'] > 0:
                 print("print X\n in gibb sampling fast ", X)
-            upd_j[i, 0] = 1
+            upd_j[i, 0] = 1 #* gamma[gamma_counter]
             #start1 = time.time()
             upd_j[:, 1] = X.T @ (X[:, i] - X_pre_upd[:, i])
             #end1 = time.time()
             #print("multiplication time: ", end1-start1)
-            upd_j[i, 1] = np.sum((X[:, i] - X_pre_upd[:, i]) * (X[:, i] + X_pre_upd[:, i])) / 2  
-            cov_test = cov_test + np.outer(old_mean_rescaled, old_mean_rescaled) - np.outer(mean_rescaled, mean_rescaled) 
-            cov_test = cov_test + np.outer(upd_j[:, 1], upd_j[:, 0]) + np.outer(upd_j[:, 0], upd_j[:, 1])
-            #print(cov_test)
+            cov_1 = cov
+            upd_j[i, 1] = np.sum((X[:, i] - X_pre_upd[:, i]) * (X[:, i] + X_pre_upd[:, i])) / 2
+            cov_temp = cov * n
+            cov_temp = cov_temp + np.outer(old_mean_rescaled, old_mean_rescaled) - np.outer(mean_rescaled, mean_rescaled)
+            cov_temp = cov_temp + np.outer(upd_j[:, 1], upd_j[:, 0]) + np.outer(upd_j[:, 0], upd_j[:, 1])
+            cov = cov_temp / n
+
+            #cov_1 = cov
+            #cov_1 = cov_1 + np.outer(old_mean, old_mean) - np.outer(mean, mean)
+            #cov_1 = cov_1 + np.outer(upd_j[:, 1], upd_j[:, 0])/n + np.outer(upd_j[:, 0], upd_j[:, 1])/n
+
+            R_centeredddd = X - np.outer(u, mean)
+            #start1 = time.time()
+            small_test = True
+            if small_test and d<=8 and n<=10:
+                covvv = R_centeredddd.T @ R_centeredddd + lbd * np.eye(d)
+                covvv = covvv / n
+                np.testing.assert_allclose(cov, covvv)
+                #np.testing.assert_allclose(cov_1, covvv)
+                print("small_test_passed_covvv and cov_1")
+                #input()
+            Q = Q / n
             Q = update_inverse_rk2_sym(Q, upd_j)
             upd_j[i, 0] = 0
+            #Q = swm_formula(Q, old_mean_rescaled  gamma[gamma_counter], 1.0)  # updates
+            #Q = swm_formula(Q, mean_rescaled  gamma[gamma_counter], -1.0)  # downdates
             Q = swm_formula(Q, old_mean_rescaled, 1.0)  # updates
             Q = swm_formula(Q, mean_rescaled, -1.0)  # downdates
-            
-            ## small test
-            #mmean = np.mean(X, axis=0)
-            #cov = X.T @ X - n * np.outer(mmean, mmean) + lbd * np.eye(d)
-            #print(cov)
-            cov = cov_test
-            #input()
-            #print("alpha ", alpha)
-            cov_gamma = cov_gamma + gamma[h] * (cov/alpha - cov_gamma)
-            cov = cov_gamma * alpha
-            #QQ = np.linalg.inv(cov)
-            #if d<=8 and n<=10:
-                #print("small check QQ\n", QQ)
-                #print("small check Q\n", Q)
-            #np.testing.assert_allclose(Q, QQ)
-            #input()
+            Q = Q * n
+            if d<=8 and n<=10:
+                QQ = np.linalg.inv(cov)
+                np.testing.assert_allclose(Q, QQ)
+                print("small test inv cov passed")
+                        
+
+            ########### REMEMBER TO CORRECT THE ALGORITHM, THE FAST VERSION WORKS IF THE STEP SIZE IS CONSTANTLY 1
         if info['save_all_iterations']:
             list_mean.append(mean)
-            list_cov.append(cov_gamma)
-            
-    res = {'imputed_dts': X, 'RM_cov': cov_gamma, 'list_mean':list_mean, 'list_cov':list_cov}  # RM: Robbins_Monro
-    return res      
+            list_cov.append(cov)
+            list_precision.append(Q)
+
+    res = {'imputed_dts': X, 'list_mean':list_mean, 'list_cov': list_cov, 'list_precision': list_precision}
+    return res
 
 
 def gibb_sampl_under_parametrized_sampling(info):

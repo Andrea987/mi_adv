@@ -376,7 +376,7 @@ def test_gibb_sampl_under_parametrized_sampling():
 def test_gibb_sampling_fast_sampling():
     print("\n\nbeginning test gibb samp fast sampling no modification\n")
     n = 10
-    d = 6
+    d = 8
     lbd = 0.98932 + 0.0
     X_orig = np.random.randint(-9, 9, size=(n, d)) + 0.0
     #X_orig = np.random.rand(n, d) + 0.0
@@ -403,6 +403,7 @@ def test_gibb_sampling_fast_sampling():
         'imputed_data': None,
         'masks': M,
         'gamma': None,
+        'save_all_iterations': False,
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,
@@ -430,6 +431,7 @@ test_gibb_sampling_over_parametrized_sampling()
 
 test_gibb_sampling_fast_sampling()
 print("pause: input()")
+input()
 
 test_gibb_sampl_under_parametrized_sampling()
 test_gibb_sampling_over_parametrized_sampling()

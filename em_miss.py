@@ -108,8 +108,9 @@ def em_miss(info):
         err = np.linalg.norm(mu_new - mu) + np.linalg.norm(S_new - S)
 
         mu, S = mu_new, S_new
-        list_mean.append(mu)
-        list_cov.append(S)
+        if info['save_all_iterations']:
+            list_mean.append(mu)
+            list_cov.append(S)
         #obs_log_lkl = obs_log_lkh(S, mu, M, X)
         #print("obs lkl in em miss: ", obs_log_lkl)
         it = it + 1
