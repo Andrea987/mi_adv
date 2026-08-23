@@ -208,27 +208,20 @@ def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, inte
     #print("masks \n", M)
     #mmean = np.mean(X, axis=0)
     #S = X.T @ X - n * np.outer(mmean, mmean) + 1.1 * np.eye(d)
-    n, d = X.shape
-    #xi = X[:, i]
-    X_i = np.delete(X, i, axis=1)
-    Q_i = np.delete(Q, i, axis=0)
-    #S_i = np.delete(S, i, axis=1)
-    mu_i = np.delete(mu, i, axis=0)
-    #v = np.zeros(d-1)
-    v = -(1 / Q[i, i]) * Q_i[:, i]
 
-    #check_v = S_i[i, :] @ np.linalg.inv( np.delete(S_i, i, axis=0) )
-    #S_current_check = S[i, i] - np.sum( S_i[i, :] * v)
+    # coefficient vector at full length d, with entry i zeroed out instead of
+    # deleting row/col i from Q/X/mu (avoids 3 np.delete allocations per call)
+    v = -(1 / Q[i, i]) * Q[:, i]
+    v[i] = 0.0
+
     S_current = 1 / Q[i, i]
-    #print("S_current ", S_current, "S_current_check ", S_current_check)
-    u = np.ones(n)
-    #prediction1 = mu[i] + (X_i - np.outer(u, mu_i)) @ v[:, None]
-    prediction = mu[i] + X_i @ v[:, None] - np.sum(mu_i * v)
-    #np.testing.assert_allclose(prediction, prediction1)
+    prediction = mu[i] + X @ v[:, None] - np.sum(mu * v)
 
-    prediction = prediction.squeeze()  #  (n, d-1) * (d-1,) = (n,), cost O(n d)
+    prediction = prediction.squeeze()  #  (n, d) * (d,) = (n,), cost O(n d)
     
-    sample = np.random.multivariate_normal(mean = prediction, cov = S_current * np.eye(n)) if sampling else prediction
+    # cov is S_current * I (independent noise per row); np.random.multivariate_normal would
+    # eigendecompose the full n x n matrix (O(n^3)) to draw this, so sample directly instead
+    sample = prediction + np.sqrt(S_current) * np.random.randn(n) if sampling else prediction
 
     X[:, i] = X[:, i] * (1 - M[:, i]) + sample.squeeze() * M[:, i] + 0.0
     return X, v  # imputed matrix, coeff
@@ -315,7 +308,9 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
             K_S_not_reg = K_SS - np.eye(n_s) * lbd
             cov_i_given_rest = (np.sum(Xss * Xss) - np.sum(Xss * (K_S_not_reg @ x1)) + lbd) / n_s
         prediction = x
-        sample = np.random.multivariate_normal(mean = prediction, cov = cov_i_given_rest * np.eye(n_m))
+        # same O(n_m^3) -> O(n_m) fix as impute_matrix_under_parametrized_sampling: the
+        # covariance here is cov_i_given_rest * I, so draw independent noise directly
+        sample = prediction + np.sqrt(cov_i_given_rest) * np.random.randn(n_m)
         x = sample
     X[m == 1, idx] = x
     return X

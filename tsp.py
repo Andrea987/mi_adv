@@ -46,6 +46,7 @@ def gibb_sampl_fast_sampling(info):
     #print("nbr masks ", np.sum(M, axis=0))
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
+    feature_order = info['feature_order'] if 'feature_order' in info else 'sequential'
     n, d = X.shape
     #b_s = int(np.sqrt(d))  # batch size
     #b_s = 10
@@ -103,7 +104,8 @@ def gibb_sampl_fast_sampling(info):
     list_precision = []
     for h in range(r):
         #print("iter ", h)
-        for i in range(d):
+        for k in range(d):
+            i = np.random.randint(d) if feature_order == 'random' else k
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
@@ -182,6 +184,7 @@ def online_gibbs_sampling(info):
     intercept = info['intercept'] if 'intercept' in info else True
     r = info['nbr_it_gibb_sampl']
     lbd = info['lbd_reg']
+    feature_order = info['feature_order'] if 'feature_order' in info else 'sequential'
     n, d = X.shape
     gamma = info['gamma'] if ('gamma' in info and info['gamma'] is not None) else np.ones(d)
     R = X.copy()  # X[first_mask == 0, :]
@@ -210,7 +213,8 @@ def online_gibbs_sampling(info):
     Q = np.linalg.inv(cov)
     for h in range(r):
         #print("iter ", h)
-        for i in range(d):
+        for k in range(d):
+            i = np.random.randint(d) if feature_order == 'random' else k
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
@@ -246,6 +250,7 @@ def gibb_sampl_under_parametrized_sampling(info):
     M = info['masks']
     sampling = info['sampling'] if 'sampling' in info else False
     intercept = info['intercept'] if 'intercept' in info else True
+    save_all_iterations = info['save_all_iterations'] if 'save_all_iterations' in info else False
     #print(M)
     #plot2D(X, M) if original_X.shape[1] == 2 else print("dimension too high, no 2D plot")
     X_nan = X.copy()
@@ -326,8 +331,14 @@ def gibb_sampl_under_parametrized_sampling(info):
     #} 
     counter_upd_dwd = 0
     counter_recomputation = 0
-    counter_swm_formula = 0 
+    counter_swm_formula = 0
     counter_reinversion = 0
+    list_mean = []
+    list_cov = []
+    list_mean_full = []
+    list_cov_full = []
+    list_imputed = []
+    ns = R.shape[0]
     #old_X = X
     print("d ** exp: ", d ** info['exponent_d'])
     for h in range(r):
@@ -511,6 +522,12 @@ def gibb_sampl_under_parametrized_sampling(info):
                     #print("cond nub Q in gibb sampl: ", np.linalg.cond(Q))
             #end = time.time() - start
             #print("final time one iter: ", end)
+        if save_all_iterations:
+            list_mean.append(mean.copy())
+            list_cov.append((Cov / ns).copy())
+            list_mean_full.append(np.mean(X, axis=0))
+            list_cov_full.append(np.cov(X, rowvar=False, ddof=0) + (lbd / n) * np.eye(d))
+            list_imputed.append(X.copy())
     #end_gibb_s = time.time()
     #stat, pvalue = Energy().test(original_X, old_X)
     #print("stat ", stat , "pvalue ", pvalue)
@@ -524,6 +541,10 @@ def gibb_sampl_under_parametrized_sampling(info):
     #start_gibb_s = 1
     #end_gibb_s = 2
     #print(f"Execution time gibb sampler: {end_gibb_s - start_gibb_s:.4f} seconds")
+    if save_all_iterations:
+        return {'imputed_dts': X, 'list_mean': list_mean, 'list_cov': list_cov,
+                'list_mean_full': list_mean_full, 'list_cov_full': list_cov_full,
+                'list_imputed': list_imputed}
     return X
 
 
