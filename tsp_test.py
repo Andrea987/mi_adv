@@ -474,8 +474,8 @@ test_gibb_sampling_over_parametrized_sampling()
 
 test_gibb_sampling_fast_sampling()
 test_online_gibbs_sampling_matches_fast_sampling()
-print("pause: input()")
-input()
+#print("pause: input()")
+#input()
 
 test_gibb_sampl_under_parametrized_sampling()
 test_gibb_sampling_over_parametrized_sampling()
