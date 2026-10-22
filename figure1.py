@@ -59,7 +59,6 @@ def plot2D_gaussian():
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,
-        'recomputation': False,
         'batch_size': 64,
         'verbose': 0,
         'initial_strategy': 'constant',

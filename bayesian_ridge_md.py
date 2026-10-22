@@ -219,7 +219,6 @@ info_dic = {
     'nbr_it_gibb_sampl': R_gibb,
     'lbd_reg': lbd,
     'tsp': False,
-    'recomputation': False,
     'lambda_init': l0,
     'alpha_init': a0,
     'max_iter_br': 2

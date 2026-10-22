@@ -94,7 +94,6 @@ def time_comparison_high_dimensional_cleaned():
                 'nbr_it_gibb_sampl': R,
                 'lbd_reg': lbd,
                 'tsp': tsp_switch,
-                #'recomputation': False,
                 'batch_size': 64,
                 'verbose': 0,
                 'initial_strategy': 'constant',
@@ -169,97 +168,6 @@ def time_comparison_high_dimensional_cleaned():
     np.save("results/experiment_3/R.npy", np.array([R]))
     np.save("results/experiment_3/rep.npy", np.array([rep]))
     np.save("results/experiment_3/prob_miss.npy", np.array([p_miss]))
-    
-    
-    '''
-    print("mean and var")
-    print(time_my_array_mean)
-    print(time_my_array_std)
-    print("check if you have extraced the right experients")
-    #input()
-
-    ## when probability = p1 or p2, then 2n(p-1)p ~ d
-    ## observe, 2n(p-1)p < np if p > (1/2), so if p greater than (1/2),
-    ## the average number of seen component is grater than the average number of flip 
-    ## if prob = d/n, the number of seen components is ~ d = n * (d/n)
-    print("d ** ", info_dic['exponent_d'], ": ", dd)
-    print("p1 ", p1, ",  p2 ", p2,  ",   d/n ", d/n)
-    print("df \n", df) 
-    print("total time gibb sampl\n", total_time_gibb_sampl)
-    print("total time ridge\n", total_time_ridge)
-    print("total time baseline\n", total_time_baseline)
-    
-    clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
-    
-    plt.plot(list_p_seen_true, time_my_array_mean, label="our_gibb, dim: " + str(d), marker="o", color=clr[0])
-    plt.plot(list_p_seen_true, time_skl_array_mean, label="ridge  , dim: " + str(d), marker="*", color=clr[1])
-    #plt.plot(list_p_seen_true, final_df['time_bsl'], label="baseline  , dim: " + str(d), marker="s", color=clr[2])
-
-    #plt.plot(x, mean, label="Mean")
-
-    plt.fill_between(
-        list_p_seen_true,
-        time_my_array_mean - time_my_array_std,
-        time_my_array_mean + time_my_array_std,
-        alpha=0.3,
-        label="±1 std"
-    )
-
-    plt.fill_between(
-        list_p_seen_true,
-        time_skl_array_mean - time_skl_array_std,
-        time_skl_array_mean + time_skl_array_std,
-        alpha=0.3,
-        label="±1 std"
-    )
-
-    plt.grid()
-    plt.legend()
-    plt.xlabel("Probability of observation")
-    plt.ylabel("Averate Time")
-    plt.show()
-    '''
-
-    '''
-    clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
-    
-    plt.plot(list_p_seen_true, final_df['time_my'], label="our_gibb, dim: " + str(d), marker="o", color=clr[0])
-    plt.plot(list_p_seen_true, final_df['time_skl'], label="ridge  , dim: " + str(d), marker="*", color=clr[1])
-    plt.plot(list_p_seen_true, final_df['time_bsl'], label="baseline  , dim: " + str(d), marker="s", color=clr[2])
-    #plt.plot(iterations, accuracy, label="Accuracy", color="blue")
-    plt.axvline(x = p1, linestyle='--', linewidth=2, label="p1: sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
-    plt.axvline(x = p2, linestyle='--', linewidth=2, label="p2: sol 2np(1-p)=d^" +  str(info_dic['exponent_d']))
-    if n >= d:
-        plt.axvline(x = d/n, linestyle='--', linewidth=1, label="d/n")
-    plt.axvline(x = 1/2, linestyle='--', linewidth=0.5, label="1/2")
-    #plt.axvline(x = d ** (3/4)/n, linestyle='--', linewidth=0.5)
-    #plt.axvline(x = (1-d/n) * (d/n), linestyle='--', linewidth=2)
-    #plt.axvline(x = 1-(1-d/n) * (d/n), linestyle='--', linewidth=2)
-    #plt.axvline(x = (1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
-    #plt.axvline(x = 1-(1-d/n) * d/n * (1/2), linestyle='--', linewidth=3)
-    plt.xlabel("prob seen")
-    plt.ylabel("time")
-    plt.title("Time in function of training size")
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    #plt.text(5.05, 0.5, "ciao sono un testo", rotation=0)
-    #text = "MCAR p_miss: " + str(p1) + "\n\n"
-    #text = "prob flip: " + str(p1) + "\n\n"
-    #text1 = "tsp: " + str(tsp_switch) + "nbr it: " + str(R)
-
-    #plt.figtext(0.71, 0.65, "Extra info about curves:\n" + text + text1, fontsize=10)
-    text = "Extra info about curves\n"
-    text0 = "nbr train: " + str(n) + "\n\n"
-    text1 = "right of the line d/n: nbr_seen> d\n\n"
-    text2 = "left of the line d/n : nbr_seen< d\n\n"
-    text3 = "between the lines p1,p2: nbr_flip > d ** " + str(info_dic['exponent_d']) + " = " + str(d ** info_dic['exponent_d']) + "\n\n"
-    text4 = "right line (1/2): number seen greater than number flips\n\n"
-    text5 = "left line (1/2):  number seen smaller than number flips\n\n"
-    text6 = "nbr repetitions: " + str(rep) + "\n\n"
-    plt.figtext(0.65, 0.37, text0 + text1 + text2 + text3 + text4 + text5 + text6, fontsize=10)
-    plt.tight_layout()
-    #plt.legend()
-    plt.show()
-    '''
 
 
 
@@ -288,8 +196,9 @@ def plot_fig_3():
     print(time_skl_array_std)
 
     clr = ['blue', 'green', 'red', "orange", "purple", "brown", 'black', 'cyan', 'magenta', 'yellow']
-    plt.plot(list_d, time_my_array_mean, label="Our implementation", marker="o", color=clr[0])
-    plt.plot(list_d, time_skl_array_mean, label="Iterative Imputer Ridge", marker="*", color=clr[1])
+    plt.figure(figsize=(12, 6))
+    plt.plot(list_d, time_my_array_mean, label="GSI-KF", marker="o", color=clr[0])
+    plt.plot(list_d, time_skl_array_mean, label="ice + ridge", marker="*", color=clr[1])
     #plt.plot(list_p_seen_true, final_df['time_bsl'], label="baseline  , dim: " + str(d), marker="s", color=clr[2])
 
     #plt.plot(x, mean, label="Mean")
@@ -312,16 +221,20 @@ def plot_fig_3():
         label="±1 std"
     )
 
-    plt.legend(fontsize=18)
-    plt.xlabel("Dimension", fontsize=24)
-    plt.ylabel("Average Time", fontsize=24)
+    plt.legend(fontsize=22)
+    plt.xlabel("Dimension", fontsize=26)
+    plt.ylabel("Average Time", fontsize=26)
+    plt.tick_params(axis='both', labelsize=22)
     plt.grid()
+    plt.tight_layout()
+    plt.savefig("results/experiment_3/Figure_3_high_dimension.pdf")
     plt.show()
 
 
 
 
-time_comparison_high_dimensional_cleaned()
-plot_fig_3()
+if __name__ == "__main__":
+    # time_comparison_high_dimensional_cleaned()
+    plot_fig_3()
 
 

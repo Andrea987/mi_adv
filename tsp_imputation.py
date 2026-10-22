@@ -196,7 +196,7 @@ def impute_matrix_under_parametrized_sampling_max_likelihood(XX, mu, S, Q, M, i)
 '''
 
 
-def impute_matrix_under_parametrized_sampling(XX, mu, S, Q, M, i, sampling, intercept):
+def impute_matrix_under_parametrized_sampling(XX, mu, Q, M, i, sampling):
     # XX input matrix
     # mu current mean
     # S current covariance matrix
@@ -300,7 +300,7 @@ def impute_matrix_over_parametrized_sampling(X, m, K ,K_inv, lbd, idx, sampling,
         #print("you are sampling")
         #print("K\n ", K)  # K is the regularize centered kernel matrix
         if cov_i_given_rest is None:
-            K_SS = K[m == 0, :][:, m == 0]  # submatrix of seen components
+            K_SS = K[m == 0, :][:, m == 0]  # submatrix of seen components, regularized
             Xss = X_s - mean_idx
             #print("test variacen ", np.sum(Xss * Xss))
             #print("Xss ", Xss)

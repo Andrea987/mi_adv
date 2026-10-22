@@ -110,7 +110,7 @@ def gibb_sampl_fast_sampling(info):
             X_pre_upd = X
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
 
-            X, _ = impute_matrix_under_parametrized_sampling(X, mean, cov, Q , M, i, sampling, intercept)
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean, Q , M, i, sampling)
             old_mean = mean
             old_mean_rescaled = np.sqrt(n) * mean  # old_mean, before making the update
             mean = np.mean(X, axis=0)  # new mean
@@ -218,7 +218,7 @@ def online_gibbs_sampling(info):
             #print("index gibb sampl no mod", i)
             X_pre_upd = X
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)
-            X, _ = impute_matrix_under_parametrized_sampling(X, mean_gamma, cov_gamma, Q , M, i, sampling, intercept)
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean_gamma, Q , M, i, sampling)
             mean_new = np.mean(X, axis=0)  # new mean
             cov_new = np.cov(X, rowvar=False, ddof=0) + lbd * np.eye(d) / n
             mean_gamma = mean_gamma + gamma[gamma_counter] * (mean_new - mean_gamma)
@@ -360,7 +360,7 @@ def gibb_sampl_under_parametrized_sampling(info):
             start = time.time()
             #alpha = R_centered.shape[0] if info['ml_or_bs'] == 'bayesian' else 1
             alpha = R_centered.shape[0]  # we need to correct by this alpha to get a correct imputation
-            X, _ = impute_matrix_under_parametrized_sampling(X, mean, Cov / alpha, Q * alpha, M, i, sampling, intercept)
+            X, _ = impute_matrix_under_parametrized_sampling(X, mean, Q * alpha, M, i, sampling)
             #X, _ = impute_matrix_under_parametrized(X, Q, M, i)  #  faster
             #print("stopppp")
             #input()
@@ -681,7 +681,6 @@ def test_gibb_sampl_under_parametrized_sampling():
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,
-        'recomputation': False,
         #'batch_size': 64,
         'verbose': 0,
         'initial_strategy': 'constant',
@@ -762,7 +761,6 @@ def test_gibb_sampl_over_parametrized_sampling():
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,
-        'recomputation': False,
         #'batch_size': 64,
         'verbose': 0,
         'initial_strategy': 'constant',

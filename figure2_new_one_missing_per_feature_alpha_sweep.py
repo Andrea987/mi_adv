@@ -54,7 +54,6 @@ def run_one_missing_per_column_over_d_alpha(list_d, alpha, save_folder, nbr_tria
                 'nbr_it_gibb_sampl': R,
                 'lbd_reg': lbd,
                 'tsp': False,
-                'recomputation': False,
                 'batch_size': 64,
                 'verbose': 0,
                 'sampling': False,
@@ -101,7 +100,6 @@ def run_one_missing_per_column_over_d_alpha(list_d, alpha, save_folder, nbr_tria
         "intercept": True,
         "sampling": False,
         "tsp": False,
-        "recomputation": False,
         "batch_size": 64,
         "ridge_estimator": "Ridge(fit_intercept=True, tol=0.0)",
         "iterative_imputer_imputation_order": "roman",
@@ -111,52 +109,8 @@ def run_one_missing_per_column_over_d_alpha(list_d, alpha, save_folder, nbr_tria
     print(f"\nsaved results and metadata.json to {folder}")
 
 
-def plot_from_folder(save_folder, title, out_file=None, max_d=None):
-    folder = Path(save_folder)
-    times_gibb_sampl = np.load(folder / "times_gibb_sampl.npy")
-    times_ridge = np.load(folder / "times_ridge.npy")
-    list_d = np.load(folder / "list_d.npy")
-    alpha, lbd, R, nbr_trials = np.load(folder / "params.npy")
-
-    if max_d is not None:
-        keep = list_d <= max_d
-        list_d = list_d[keep]
-        times_gibb_sampl = times_gibb_sampl[keep]
-        times_ridge = times_ridge[keep]
-
-    mean_gibb = times_gibb_sampl.mean(axis=1)
-    mean_ridge = times_ridge.mean(axis=1)
-
-    log_d = np.log(list_d)
-    log_gibb = np.log(mean_gibb)
-    log_ridge = np.log(mean_ridge)
-
-    slope_gibb, intercept_gibb = np.polyfit(log_d, log_gibb, 1)
-    slope_ridge, intercept_ridge = np.polyfit(log_d, log_ridge, 1)
-    print(f"\nfitted slope (power-law exponent) gibb sampl: {slope_gibb:.4f}")
-    print(f"fitted slope (power-law exponent) IterativeImputer(Ridge): {slope_ridge:.4f}")
-
-    plt.scatter(log_d, log_gibb, label="our gibb sampl (under-param, sampling)", marker="o", color="blue")
-    plt.plot(log_d, slope_gibb * log_d + intercept_gibb, color="blue", linestyle="--",
-              label=f"fit gibb: slope={slope_gibb:.2f}")
-    plt.scatter(log_d, log_ridge, label="IterativeImputer(Ridge, intercept=True)", marker="*", color="green")
-    plt.plot(log_d, slope_ridge * log_d + intercept_ridge, color="green", linestyle="--",
-              label=f"fit ridge: slope={slope_ridge:.2f}")
-    plt.xlabel("log(d)")
-    plt.ylabel("log(time)")
-    plt.title(f"{title}\nlog(time) vs log(d), averaged over {int(nbr_trials)} trials "
-              f"(n=alpha*d, alpha={alpha}, one missing component per column)")
-    plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-    if out_file is not None:
-        plt.savefig(out_file, dpi=150)
-        print(f"saved plot to {out_file}")
-    else:
-        plt.show()
-
-
 def plot_combined_from_folder(save_folder, title, out_file=None, max_d=None):
-    # stacked figure: raw time vs d (linear scale) on top, log-log with power-law fit below
+    # Figure 2: raw time vs d (left) and log-log with power-law fit (right), side by side
     folder = Path(save_folder)
     times_gibb_sampl = np.load(folder / "times_gibb_sampl.npy")
     times_ridge = np.load(folder / "times_ridge.npy")
@@ -186,33 +140,33 @@ def plot_combined_from_folder(save_folder, title, out_file=None, max_d=None):
     print(f"\nfitted slope (power-law exponent) gibb sampl: {slope_gibb:.4f}")
     print(f"fitted slope (power-law exponent) IterativeImputer(Ridge): {slope_ridge:.4f}")
 
-    fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(8, 11))
+    fig, (ax_top, ax_bottom) = plt.subplots(1, 2, figsize=(16, 6))
 
-    ax_top.plot(list_d, mean_gibb, label="our gibb sampl (under-param, sampling)", marker="o", color="blue")
+    ax_top.plot(list_d, mean_gibb, label="GSI-UD", marker="o", color="blue")
     ax_top.fill_between(list_d, mean_gibb - std_gibb, mean_gibb + std_gibb, alpha=0.3, color="blue")
-    ax_top.plot(list_d, mean_ridge, label="IterativeImputer(Ridge, intercept=True)", marker="*", color="green")
+    ax_top.plot(list_d, mean_ridge, label="ice + ridge", marker="*", color="green")
     ax_top.fill_between(list_d, mean_ridge - std_ridge, mean_ridge + std_ridge, alpha=0.3, color="green")
-    ax_top.set_xlabel("d")
-    ax_top.set_ylabel("time (s)")
-    ax_top.set_title(f"{title}\ntime vs d, averaged over {int(nbr_trials)} trials, shaded band = 1 std "
-                      f"(n=alpha*d, alpha={alpha}, one missing component per column)")
-    ax_top.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax_top.set_xlabel("d", fontsize=26)
+    ax_top.set_ylabel("time (s)", fontsize=26)
+    ax_top.tick_params(axis='both', labelsize=22)
     ax_top.grid()
 
-    ax_bottom.plot(log_d, log_gibb, label="our gibb sampl (under-param, sampling)", marker="o", color="blue")
+    ax_bottom.plot(log_d, log_gibb, label="GSI-UD", marker="o", color="blue")
     ax_bottom.fill_between(log_d, log_gibb - log_std_gibb, log_gibb + log_std_gibb, alpha=0.3, color="blue")
     ax_bottom.plot(log_d, slope_gibb * log_d + intercept_gibb, color="blue", linestyle="--",
-                    label=f"fit gibb: slope={slope_gibb:.2f}")
-    ax_bottom.plot(log_d, log_ridge, label="IterativeImputer(Ridge, intercept=True)", marker="*", color="green")
+                    label=f"fit exponent GSI-UD: slope={slope_gibb:.2f}")
+    ax_bottom.plot(log_d, log_ridge, label="ice + ridge", marker="*", color="green")
     ax_bottom.fill_between(log_d, log_ridge - log_std_ridge, log_ridge + log_std_ridge, alpha=0.3, color="green")
     ax_bottom.plot(log_d, slope_ridge * log_d + intercept_ridge, color="green", linestyle="--",
-                    label=f"fit ridge: slope={slope_ridge:.2f}")
-    ax_bottom.set_xlabel("log(d)")
-    ax_bottom.set_ylabel("log(time)")
-    ax_bottom.set_title("log(time) vs log(d), with fitted power-law exponent, shaded band = 1 std (delta method)")
-    ax_bottom.legend(loc='upper left', bbox_to_anchor=(1, 1))
+                    label=f"fit exponent ice + ridge: slope={slope_ridge:.2f}")
+    ax_bottom.set_xlabel("log(d)", fontsize=26)
+    ax_bottom.set_ylabel("log(time)", fontsize=26)
+    ax_bottom.tick_params(axis='both', labelsize=22)
+    ax_bottom.grid()
 
-    plt.tight_layout()
+    # one shared legend under both panels; the log-log panel holds all four entries
+    fig.legend(*ax_bottom.get_legend_handles_labels(), loc='lower center', ncol=2, fontsize=22, frameon=False)
+    plt.tight_layout(rect=(0, 0.2, 1, 1))
     if out_file is not None:
         plt.savefig(out_file, dpi=150)
         print(f"saved plot to {out_file}")
@@ -221,11 +175,12 @@ def plot_combined_from_folder(save_folder, title, out_file=None, max_d=None):
 
 
 if __name__ == "__main__":
-    list_d = [1000, 1005, 1010, 1015, 1020, 1023, 1024]
+    # Figure 2: n = round(alpha * d), d = 100..1200, 10 trials per d
+    list_d = list(range(100, 1201, 100))
     alpha = 1.15
     lbd = 10.0
-    save_folder = "results/experiment_2_one_missing_per_feature_alpha_sweep_gap_1000_1024"
+    save_folder = "results/experiment_2_one_missing_per_feature_alpha_sweep_100_1200_10trials"
 
-    run_one_missing_per_column_over_d_alpha(list_d, alpha, save_folder, nbr_trials=3, lbd=lbd)
-    plot_combined_from_folder(save_folder, "Time vs feature dimension, n tied to d via alpha (probing 1000-1024 gap)",
-                               out_file=f"{save_folder}/plot_combined.pdf")
+    # run_one_missing_per_column_over_d_alpha(list_d, alpha, save_folder, nbr_trials=10, lbd=lbd)
+    plot_combined_from_folder(save_folder, "",
+                              out_file=f"{save_folder}/runtime_vs_dimension_gibbs_vs_ridge_alpha_sweep_100_1200_10trials_GSI-UD.pdf")

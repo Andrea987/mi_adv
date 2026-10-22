@@ -24,10 +24,10 @@ STYLES = {
 }
 
 LABELS = {
-    'fast sampling (sequential)': 'online multiple imputation (sequential)',
-    'fast sampling (random)': 'online multiple imputation (random)',
-    'online gibbs (sequential)': r'online gibbs (sequential, $\gamma_k=1/k$)',
-    'online gibbs (random)': r'online gibbs (random, $\gamma_k=1/k$)',
+    'fast sampling (sequential)': r'OG - deterministic, $\gamma_k = 1$',
+    'fast sampling (random)': r'OG - random, $\gamma_k = 1$',
+    'online gibbs (sequential)': r'OG - deterministic, $\gamma_k = 1/k$',
+    'online gibbs (random)': r'OG - random, $\gamma_k = 1/k$',
 }
 
 
@@ -76,7 +76,6 @@ def _run_once(seed, n, d, lbd, R, p_mcar):
         'nbr_it_gibb_sampl': R,
         'lbd_reg': lbd,
         'tsp': False,
-        'recomputation': False,
         'initial_strategy': 'constant',
         'sampling': True,
         'intercept': True,
@@ -147,17 +146,11 @@ def stochastic_approximation_log_likelihood():
 
 
 def _plot_stochastic_approximation_results(n, d, R, n_repeats, all_neg_ll, all_grad, folder):
-    # fig, (ax_ll, ax_grad) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
-    fig, ax_grad = plt.subplots(figsize=(12, 5))
+    fig, ax_grad = plt.subplots(figsize=(12, 7.5))
     iters = np.arange(R)
 
     for m in METHODS:
         color = STYLES[m]['color']
-
-        # mean_ll = all_neg_ll[m].mean(axis=0)
-        # std_ll = all_neg_ll[m].std(axis=0)
-        # ax_ll.plot(iters, mean_ll, label=m, **STYLES[m])
-        # ax_ll.fill_between(iters, mean_ll - std_ll, mean_ll + std_ll, alpha=0.3, color=color)
 
         mean_grad = all_grad[m].mean(axis=0)
         std_grad = all_grad[m].std(axis=0)
@@ -165,18 +158,14 @@ def _plot_stochastic_approximation_results(n, d, R, n_repeats, all_neg_ll, all_g
         ax_grad.fill_between(iters, np.maximum(mean_grad - std_grad, 1e-8), mean_grad + std_grad,
                               alpha=0.3, color=color)
 
-    # ax_ll.set_ylabel("-log-likelihood")
-    # ax_ll.set_title(f"-Log-likelihood vs Gibbs iteration (n={n}, d={d}, {n_repeats} repeats, mean ± 1 std)")
-    # ax_ll.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    # ax_ll.grid(which='both')
-
-    ax_grad.set_xlabel("Iterations", fontsize=16)
-    ax_grad.set_ylabel("Gradient norm", fontsize=16)
-    # ax_grad.set_title("Gradient norm vs Gibbs iteration", fontsize=15, fontweight='bold')
-    ax_grad.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=13)
+    ax_grad.set_xlabel("Iterations", fontsize=24)
+    ax_grad.set_ylabel("Gradient norm", fontsize=24)
+    ax_grad.tick_params(axis='both', labelsize=20)
     ax_grad.grid(which='both')
 
-    plt.tight_layout()
+    # legend under the plot so the bigger text does not squeeze the axes
+    fig.legend(*ax_grad.get_legend_handles_labels(), loc='lower center', ncol=2, fontsize=18, frameon=False)
+    plt.tight_layout(rect=(0, 0.17, 1, 1))
 
     fig.savefig(folder / "plot.pdf")
     print(f"\nsaved plot to {folder / 'plot.pdf'}")
